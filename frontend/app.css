@@ -8,9 +8,15 @@
 
    Paleta de series validada con el validador de dataviz sobre la superficie
    oscura #14141a, comparando TODOS los pares: verde #199e70 (Kiki), naranja
-   #d95926 (No Kiki), azul #256bb1 (Gayola) y violeta #9085e9 (Marea). Peor
-   par con deuteranopía ΔE 9.4, peor par con visión normal ΔE 17.1, y las
-   cuatro por encima de 3:1 de contraste contra el fondo.
+   #d95926 (No Kiki) y azul #256bb1 (Gayola). Peor par con deuteranopía
+   ΔE 9.4, peor par con visión normal ΔE 20.7, las tres por encima de 3:1.
+
+   La Marea va en rojo #c52233, por analogía con la sangre. Ese rojo queda
+   cerca del naranja del No Kiki (ΔE 10.7 en visión normal, por debajo del
+   suelo de 15 que pide una paleta categórica), así que NO se usa como serie
+   en ningún gráfico ni como relleno de celda: aparece sólo como franja
+   inferior del día. La posición y la forma son las que distinguen, no el
+   tono.
 --------------------------------------------------------------------------- */
 @theme {
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -30,7 +36,9 @@
   --color-kiki: #199e70;
   --color-nokiki: #d95926;
   --color-gayola: #256bb1;
-  --color-marea: #9085e9;
+  --color-marea: #c52233;
+  /* Segundo contexto secuencial del gráfico de valoraciones. */
+  --color-tiempo: #9085e9;
 
   --color-good: #0ca30c;
   --color-warning: #fab219;
@@ -200,9 +208,9 @@
     color: #9dc2ea;
   }
   .chip-marea {
-    background-color: rgb(144 133 233 / 0.15);
-    border-color: rgb(144 133 233 / 0.4);
-    color: #c3bcf6;
+    background-color: rgb(197 34 51 / 0.15);
+    border-color: rgb(197 34 51 / 0.45);
+    color: #f09aa4;
   }
 
   /* Tabla ------------------------------------------------------------------ */
@@ -232,9 +240,65 @@
     background-color: var(--color-surface-2);
   }
 
-  /* Celdas del calendario -------------------------------------------------- */
+  /* Celdas del calendario --------------------------------------------------
+     Un día con varios eventos se parte en tantas bandas verticales como
+     eventos tenga, todas del mismo ancho: ninguna categoría tapa a otra.
+     Lo que separa las bandas es un hueco del color de la superficie, no un
+     borde, para no añadir tinta que no es dato. */
+  .cal-bandas {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    gap: 2px;
+    border-radius: inherit;
+    overflow: hidden;
+  }
+
+  .cal-banda {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  /* La Marea no llena el día: es una franja al pie. El realce superior de
+     2px en el color de la superficie hace de hueco contra las bandas. */
+  .cal-marea {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 7px;
+    z-index: 1;
+    background-color: var(--color-marea);
+    box-shadow: 0 -2px 0 var(--color-surface-2);
+  }
+
+  .cal-mini .cal-marea {
+    height: 3px;
+    box-shadow: 0 -1px 0 var(--color-surface-2);
+  }
+
+  .cal-numero {
+    position: relative;
+    z-index: 1;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1;
+    padding: 0.1875rem 0.4375rem;
+    border-radius: 0.375rem;
+  }
+
+  /* Sobre bandas de color la cifra necesita su propio fondo: con varios
+     rellenos detrás no se puede elegir una tinta que valga para todos. */
+  .cal-numero[data-sobre-color="true"] {
+    background-color: rgb(12 12 16 / 0.72);
+    color: var(--color-ink);
+  }
+
   .cal-cell {
     position: relative;
+    /* Recorta bandas y franja: si no, sus esquinas cuadradas asoman por
+       fuera del redondeo de la celda. */
+    overflow: hidden;
     /* La celda ocupa el ancho de su columna y lleva alto fijo: así queda
        alineada bajo la cabecera del día y el mes entra en una pantalla. */
     width: 100%;
@@ -257,6 +321,20 @@
   }
   .cal-cell[data-today="true"] {
     border-color: var(--color-ink-2);
+  }
+
+  /* Versión reducida para los doce mini-meses de la vista anual. */
+  .cal-mini {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: 3px;
+    overflow: hidden;
+    display: flex;
+    gap: 1px;
+  }
+
+  .cal-mini .cal-bandas {
+    gap: 1px;
   }
   .cal-cell[data-outside="true"] {
     opacity: 0.25;

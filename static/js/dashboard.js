@@ -288,37 +288,38 @@ function dashboard() {
 
     decorar(fecha) {
       const dia = this.dias[fecha];
-      const vacio = {
-        fondo: K.COLOR.surface2,
-        fondoSolido: K.COLOR.surface2,
-        tinta: K.COLOR.ink3,
-        marcas: [],
-        titulo: `${K.fechaCorta(fecha)} · sin actividad`,
-      };
-      if (!dia) return vacio;
+      if (!dia) {
+        return { bandas: [], marea: false,
+                 titulo: `${K.fechaCorta(fecha)} · sin actividad` };
+      }
 
-      // Si el día tiene varios tipos, manda el primero de este orden.
-      const tipos = dia.tipos;
-      const dominante = ['Kiki', 'Gayola', 'No Kiki', 'Marea']
-        .find((tipo) => tipos.includes(tipo));
-      // Sólo el Kiki se valora, así que sólo él lleva rampa de intensidad.
-      const fondo = dominante === 'Kiki'
-        ? K.intensidadKiki(Math.max(dia.calidad_max, dia.tiempo_max))
-        : K.COLOR_POR_TIPO[dominante];
+      // Orden fijo por tipo para que una misma combinación se vea siempre
+      // igual. No es jerarquía: todas las bandas miden lo mismo.
+      const eventos = [...dia.eventos].sort(
+        (a, b) => K.TIPOS.indexOf(a.tipo) - K.TIPOS.indexOf(b.tipo)
+      );
 
-      const detalle = dia.eventos
-        .map((evento) =>
-          evento.tipo === 'Kiki'
-            ? `Kiki (calidad ${evento.calidad}, tiempo ${evento.tiempo})`
-            : evento.tipo
-        )
+      // La Marea no compite por el cuadro: es una franja al pie del día.
+      const bandas = eventos
+        .filter((evento) => evento.tipo !== 'Marea')
+        .map((evento) => ({
+          // Sólo el Kiki se valora: su banda es un medidor que se llena de
+          // abajo arriba. Las demás categorías van en color plano.
+          color: evento.tipo === 'Kiki'
+            ? K.medidorKiki(Math.max(evento.calidad, evento.tiempo))
+            : K.COLOR_POR_TIPO[evento.tipo],
+          tipo: evento.tipo,
+        }));
+
+      const detalle = eventos
+        .map((evento) => (evento.tipo === 'Kiki'
+          ? `Kiki (calidad ${evento.calidad}, tiempo ${evento.tiempo})`
+          : evento.tipo))
         .join(' · ');
 
       return {
-        fondo,
-        fondoSolido: K.mezclarSobre(fondo),
-        tinta: K.tintaSobre(fondo),
-        marcas: tipos.filter((tipo) => tipo !== dominante).map((tipo) => K.COLOR_POR_TIPO[tipo]),
+        bandas,
+        marea: eventos.some((evento) => evento.tipo === 'Marea'),
         titulo: `${K.fechaCorta(fecha)} · ${detalle}`,
       };
     },
@@ -337,8 +338,7 @@ function dashboard() {
         if (fuera) {
           celdas.push({
             clave: `${anio}-${mes}-x${indice}`, fuera: true, dia: '',
-            fondo: 'transparent', fondoSolido: K.COLOR.surface, tinta: K.COLOR.ink3,
-            marcas: [], titulo: '',
+            bandas: [], marea: false, titulo: '',
           });
           continue;
         }

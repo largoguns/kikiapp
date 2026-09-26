@@ -156,9 +156,16 @@ docker compose exec kiki-app python tools/import_file.py /app/data/Kiki.xlsx
 
 ### `/` — Dashboard de escritorio
 
-- **Calendario** mensual y anual con intensidad de color proporcional a la
-  calidad/tiempo del encuentro. Un clic en un día abre su registro o crea uno
-  nuevo con la fecha ya puesta.
+- **Calendario** mensual y anual. Un clic en un día abre su registro o crea
+  uno nuevo con la fecha ya puesta. Cómo se lee un día:
+  - Cada evento ocupa **una banda vertical del mismo ancho**: dos eventos
+    parten el cuadro en dos, tres en tres. Ninguna categoría tapa a otra, y
+    lo que las separa es un hueco del color de la celda, no un borde.
+  - La banda de un `Kiki` es un **medidor** que se llena de abajo arriba
+    según su valoración: los cinco escalones alcanzados van en verde pleno y
+    los que faltan en el mismo verde apagado, así que el nivel se cuenta en
+    lugar de adivinarse. Las categorías sin valoración van en color plano.
+  - La `Marea` no ocupa el cuadro: es una **franja roja al pie del día**.
 - **Panel de KPIs**: días desde el último Kiki, totales, medias de calidad y
   tiempo, mayor sequía registrada y métricas de ciclo (día del ciclo, duración
   media, próxima prevista).
@@ -354,16 +361,24 @@ tests/                   Suite de pytest
 
 ## Decisiones de diseño
 
-**Los colores no son decorativos.** La paleta de series está validada para
-daltonismo y contraste sobre el fondo oscuro de la app: verde `#199e70` para
-Kiki, naranja `#d95926` para No Kiki, azul `#256bb1` para Gayola y violeta
-`#9085e9` para Marea. Comparando todos los pares, el peor caso simulando
-deuteranopía es ΔE 9.4 y el peor con visión normal es ΔE 17.1; las cuatro
-superan 3:1 de contraste. El cuarto color no se eligió a ojo: se barrió el
-espacio OKLCH y se validaron los candidatos, porque sobre fondo oscuro la
-mayoría de combinaciones de cuatro series no superan la prueba. En el
-calendario, la intensidad del verde es una rampa de un solo tono (0→4), nunca
-un arcoíris; las categorías sin valoración van en color plano.
+**Los colores no son decorativos.** Las tres categorías que se pintan como
+series —verde `#199e70` para Kiki, naranja `#d95926` para No Kiki y azul
+`#256bb1` para Gayola— están validadas para daltonismo y contraste sobre el
+fondo oscuro: comparando todos los pares, el peor caso con deuteranopía es
+ΔE 9.4 y el peor con visión normal ΔE 20.7, y las tres superan 3:1. El azul
+no se eligió a ojo: se barrió el espacio OKLCH y se validaron los
+candidatos, porque sobre fondo oscuro la mayoría de combinaciones de cuatro
+series no pasan la prueba.
+
+**Y donde hay un compromiso, está dicho.** La `Marea` va en rojo `#c52233`
+por analogía con la sangre. Ese rojo queda cerca del naranja del No Kiki:
+ΔE 9.2 con deuteranopía —por encima del objetivo de 8— pero **ΔE 10.7 en
+visión normal, por debajo del suelo de 15** que pediría una paleta
+categórica. Por eso la Marea **no se usa nunca como serie ni como relleno de
+celda**: aparece sólo como franja inferior, con su etiqueta en la leyenda y
+en la tabla. Lo que la distingue es la posición y la forma, no el tono. Si
+alguna vez se confunden de un vistazo, la solución es mover el No Kiki a
+otro tono, no aclarar el rojo.
 
 **El color nunca es el único canal.** Cada gráfico tiene leyenda y una gemela
 en tabla a un clic, los tipos llevan etiqueta de texto junto al punto de

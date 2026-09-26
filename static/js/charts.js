@@ -195,8 +195,8 @@
           labels: etiquetas,
           datasets: [
             serie('Calidad', C.kiki, calidad.map((p) => p.total)),
-            // Segundo contexto secuencial → siguiente tono categórico.
-            serie('Tiempo', C.marea, tiempo.map((p) => p.total)),
+            // Segundo contexto secuencial → su propio tono, no el de una categoría.
+            serie('Tiempo', C.tiempo, tiempo.map((p) => p.total)),
           ],
         },
         options: opcionesBase({

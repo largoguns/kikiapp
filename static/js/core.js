@@ -9,7 +9,9 @@
     kiki: '#199e70',
     nokiki: '#d95926',
     gayola: '#256bb1',
-    marea: '#9085e9',
+    marea: '#c52233',
+    // Segunda serie del gráfico de valoraciones, no es una categoría.
+    tiempo: '#9085e9',
     surface: '#14141a',
     surface2: '#1c1c24',
     ink: '#f6f7f9',
@@ -45,6 +47,41 @@
 
   function intensidadKiki(nivel) {
     return RAMPA_KIKI[Math.max(0, Math.min(4, nivel | 0))];
+  }
+
+  /* Medidor tipo vúmetro para la celda del calendario.
+
+     Cinco escalones de abajo arriba: los alcanzados van en el color pleno y
+     los que faltan en el mismo tono apagado, que es lo que pide un medidor
+     —pista y relleno del mismo tono— y hace la intensidad contable en vez de
+     adivinable. Se devuelve como un único degradado con paradas duras, para
+     no meter cinco elementos por celda en el DOM. */
+  const ESCALONES = 5;
+  const HUECO_PX = 1;       // separación entre escalones, del color del hueco
+  const APAGADO = 'rgba(25, 158, 112, 0.22)';
+
+  function medidorKiki(nivel, hueco) {
+    const alcanzado = Math.max(0, Math.min(ESCALONES - 1, nivel | 0));
+    const fondo = hueco || COLOR.surface2;
+    const paradas = [];
+
+    for (let escalon = 0; escalon < ESCALONES; escalon += 1) {
+      const color = escalon <= alcanzado ? COLOR.kiki : APAGADO;
+      const base = (escalon * 100) / ESCALONES;
+      const techo = ((escalon + 1) * 100) / ESCALONES;
+      const desde = escalon === 0 ? '0%' : `calc(${base}% + ${HUECO_PX}px)`;
+      const hasta = escalon === ESCALONES - 1
+        ? '100%'
+        : `calc(${techo}% - ${HUECO_PX}px)`;
+      paradas.push(`${color} ${desde}`, `${color} ${hasta}`);
+      if (escalon < ESCALONES - 1) {
+        paradas.push(
+          `${fondo} calc(${techo}% - ${HUECO_PX}px)`,
+          `${fondo} calc(${techo}% + ${HUECO_PX}px)`
+        );
+      }
+    }
+    return `linear-gradient(to top, ${paradas.join(', ')})`;
   }
 
 
@@ -178,6 +215,7 @@
     CLASE_POR_TIPO,
     MESES_LARGOS,
     intensidadKiki,
+    medidorKiki,
     tintaSobre,
     mezclarSobre,
     api,
