@@ -1,12 +1,11 @@
 services:
   kiki-app:
-    # La imagen se construye siempre a partir del código de este repositorio.
+    # La imagen se construye a partir del código de este repositorio.
     # No hay nada publicado en Docker Hub ni en ningún otro registro.
     build:
       context: .
       dockerfile: Dockerfile
-    # Sólo es la etiqueta local que recibe la imagen recién construida,
-    # no una imagen que se descargue de fuera.
+    # Sólo es la etiqueta local que recibe la imagen recién construida.
     image: kiki-app:latest
     # Fuerza construir en lugar de intentar descargar, también en Portainer.
     pull_policy: build
@@ -17,26 +16,8 @@ services:
     environment:
       - PORT=8080
       - TZ=Europe/Madrid
-      # --- Google Sheets -------------------------------------------------
-      - SYNC_ENABLED=true
-      - GOOGLE_SHEETS_CREDENTIALS_FILE=/app/credentials.json
-      # Identifica la hoja por id (el trozo largo de su URL) o, si se deja
-      # vacío, por nombre. El id es más fiable: no depende de renombrados.
-      - GOOGLE_SHEET_ID=
-      - GOOGLE_SHEET_NAME=Kiki
-      # Pestaña dentro del documento. Si no existe, se usa la primera.
-      - GOOGLE_WORKSHEET_NAME=Kikis
-      - SYNC_INTERVAL_MINUTES=360
-      # Arranca SIN sincronizar a propósito: la primera exportación reescribe
-      # la hoja entera. Importa primero con `direction=pull`, comprueba que
-      # los datos han entrado bien y pon esto a true después.
-      - SYNC_ON_STARTUP=false
     volumes:
       - kiki_data:/app/data
-      # credentials.json DEBE existir en la raíz del proyecto antes de
-      # levantar el contenedor: si no, Docker crea un directorio con ese
-      # nombre y la sincronización fallará.
-      - ./credentials.json:/app/credentials.json:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health').read()"]
       interval: 30s

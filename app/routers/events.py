@@ -11,7 +11,6 @@ from app import crud
 from app.routers.common import Filters
 from app.schemas import EventCreate, EventPage, EventUpdate, Options
 from app.schemas import MOTIVACIONES, PRETEXTOS_SUGERIDOS, TIPOS
-from app.services.sync import manager as sync_manager
 
 router = APIRouter(prefix="/api", tags=["registros"])
 
@@ -39,7 +38,6 @@ def get_event(event_id: int) -> Any:
 @router.post("/events", status_code=status.HTTP_201_CREATED, summary="Crear registro")
 async def create_event(payload: EventCreate) -> Any:
     evento = await run_in_threadpool(crud.create_event, payload)
-    sync_manager.schedule_push()
     return evento
 
 
@@ -48,7 +46,6 @@ async def update_event(event_id: int, payload: EventUpdate) -> Any:
     evento = await run_in_threadpool(crud.update_event, event_id, payload)
     if not evento:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Registro no encontrado")
-    sync_manager.schedule_push()
     return evento
 
 
@@ -57,7 +54,6 @@ async def update_event(event_id: int, payload: EventUpdate) -> Any:
 async def delete_event(event_id: int) -> Response:
     if not await run_in_threadpool(crud.delete_event, event_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Registro no encontrado")
-    sync_manager.schedule_push()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

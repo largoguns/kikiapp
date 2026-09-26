@@ -102,11 +102,8 @@ def test_resumen_y_series(cliente):
     assert calendario["dias"]["2026-03-01"]["calidad_max"] == 4
 
 
-def test_sync_sin_credenciales_no_rompe(cliente):
-    estado = cliente.get("/api/sync").json()
-    assert estado["configured"] is False
-    resultado = cliente.post("/api/sync").json()
-    assert resultado["ok"] is False and resultado["last_error"]
+def test_sin_importaciones_previas(cliente):
+    assert cliente.get("/api/import").json()["ultima_importacion"] is None
 
 
 def test_health_y_vistas(cliente):

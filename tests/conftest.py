@@ -15,7 +15,6 @@ from app import config, db  # noqa: E402
 @pytest.fixture(autouse=True)
 def base_temporal(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.db")
-    monkeypatch.setattr(config, "SYNC_ENABLED", False)
     db.init_db()
     yield
 

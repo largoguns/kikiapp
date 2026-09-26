@@ -5,9 +5,13 @@ Aplicación web ligera para registrar y analizar **encuentros (Kiki)**,
 dashboard completo de escritorio y una PWA móvil pensada para apuntar un
 registro en tres toques.
 
-Todo vive en un único contenedor: FastAPI sirve la API y las dos vistas, los
-datos se guardan en SQLite dentro de un volumen, y —opcionalmente— se
-sincronizan en ambos sentidos con una hoja de Google Sheets.
+Todo vive en un único contenedor: FastAPI sirve la API y las dos vistas, y
+los datos se guardan en SQLite dentro de un volumen. **La app es la fuente de
+verdad**; el histórico que vivía en la hoja de cálculo se trae una sola vez
+con el importador.
+
+No habla con ningún servicio externo: no hay credenciales, ni claves de API,
+ni secretos que gestionar en Portainer.
 
 ---
 
@@ -15,7 +19,7 @@ sincronizan en ambos sentidos con una hoja de Google Sheets.
 
 - [Puesta en marcha](#puesta-en-marcha)
 - [Configuración](#configuración)
-- [Sincronización con Google Sheets](#sincronización-con-google-sheets)
+- [Importar el histórico](#importar-el-histórico)
 - [Las dos vistas](#las-dos-vistas)
 - [API REST](#api-rest)
 - [Modelo de datos](#modelo-de-datos)
@@ -55,18 +59,13 @@ la imagen recién construida, y `pull_policy: build` obliga a reconstruirla en
 lugar de intentar descargarla. Para desplegar una versión nueva basta con
 hacer push al repositorio y pulsar **Update the stack** en Portainer.
 
-Para activar la sincronización con Google Sheets hace falta, además, que el
-fichero `credentials.json` exista en el host antes de levantar el stack y
-descomentar su línea en `docker-compose.yml`.
-
 ### En local, sin Docker
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 
-DATA_DIR=./data SYNC_ENABLED=false \
-  .venv/bin/python -m uvicorn app.main:app --reload --port 8080
+DATA_DIR=./data .venv/bin/python -m uvicorn app.main:app --reload --port 8080
 ```
 
 ¿Quieres verlo con contenido antes de meter datos reales?
@@ -88,64 +87,68 @@ Hay una plantilla en [`.env.example`](.env.example).
 | `TZ` | `Europe/Madrid` | Zona horaria con la que se calcula "hoy" (y por tanto los días sin Kiki). |
 | `DATA_DIR` | `/app/data` | Carpeta del volumen donde vive `kiki.db`. |
 | `DB_PATH` | `$DATA_DIR/kiki.db` | Ruta explícita de la base de datos. |
-| `SYNC_ENABLED` | `true` | Interruptor general de la sincronización con Sheets. |
-| `GOOGLE_SHEETS_CREDENTIALS_FILE` | `/app/credentials.json` | JSON de la Cuenta de Servicio. |
-| `GOOGLE_SHEET_NAME` | `Kiki` | Nombre del documento en Drive. |
-| `GOOGLE_SHEET_ID` | — | Id del documento. Si se informa, tiene prioridad sobre el nombre. |
-| `GOOGLE_WORKSHEET_NAME` | `Kikis` | Pestaña dentro del documento. Si no existe, se usa la primera. |
-| `SYNC_ON_STARTUP` | `true` | Sincroniza al arrancar el contenedor. |
-| `SYNC_INTERVAL_MINUTES` | `360` | Cada cuánto se repite la sincronización periódica. |
-| `SYNC_PUSH_DEBOUNCE_SECONDS` | `5` | Espera antes de exportar tras una escritura, para agrupar ráfagas. |
 
-**Sin credenciales la app funciona con normalidad**: se queda en modo local,
-lo dice en la cabecera del dashboard y no vuelve a intentarlo.
+Ninguna es un secreto, así que se pueden poner directamente en el stack de
+Portainer sin más cuidado.
 
 ---
 
-## Sincronización con Google Sheets
+## Importar el histórico
 
-La hoja de Drive se mantiene como espejo de la base de datos local. SQLite es
-siempre la fuente de respuesta —por eso la app va instantánea y funciona sin
-red— y Sheets es la copia legible y editable a mano.
+Pensado para usarse **una vez**, al estrenar la app. Se sube el fichero desde
+**Importar histórico** en el dashboard, o con el endpoint `POST /api/import`.
+Acepta `.xlsx` y `.csv`, y todo el proceso ocurre en local: no hace falta
+compartir nada ni dar acceso a Drive.
 
-### Cómo funciona
+### De dónde sale cada cosa
 
-- **Importar (`pull`).** Se lee la hoja entera y se fusiona en SQLite. Las
-  filas con `id` conocido **mandan sobre la copia local**, para que una
-  edición hecha a mano en Drive se respete. Las filas sin `id` se emparejan
-  por (fecha, tipo) y, si no existen, se insertan.
-- **Exportar (`push`).** Se reescribe la hoja completa con el estado local.
-  Con unos cientos de filas esto es más simple y fiable que llevar un diario
-  de cambios fila a fila, y de paso asigna `id` a lo que se añadió a mano.
-- **Cuándo.** Al arrancar, cada `SYNC_INTERVAL_MINUTES`, tras cada escritura
-  (sólo `push`, en segundo plano y agrupando ráfagas) y cuando pulsas
-  **Forzar sincronización**.
+El libro original guarda la información repartida en dos sitios, y el
+importador lee ambos:
 
-La hoja usa estas columnas, en este orden:
+- **La pestaña de datos** (`Kikis`) trae los encuentros con pretexto,
+  motivación, valoraciones y observaciones. De las varias pestañas del libro
+  se queda con la que más filas válidas produce, así que los calendarios se
+  descartan solos. También se puede forzar una pestaña concreta.
+- **Las pestañas de calendario** (una por año) marcan la menstruación
+  pintando de rojo la celda del día. Esos días no aparecen en la tabla, así
+  que se leen del color de relleno.
 
+Se aceptan alias de cabecera habituales —`Día`, `Categoría`, `Motivo`,
+`Iniciativa`, `Nota`, `Duración`, `Comentarios`— sin distinguir mayúsculas ni
+acentos, y las fechas valen en ISO, `dd/mm/aaaa`, `dd-mm-aa` o como número de
+serie de la hoja. Un `N/A` en el pretexto se guarda como "sin pretexto".
+
+### Dos deducciones, y por qué son seguras
+
+- **El tipo.** La hoja original no tiene columna de tipo: marca el
+  desencuentro poniendo `calidad` y `tiempo` a 0. Nunca deja sólo una de las
+  dos a cero, así que la regla `0/0 → No Kiki` sale del propio fichero, no de
+  una suposición. Si algún día la hoja trae columna de tipo, esa manda.
+- **La Marea.** Se clasifica por **tono**, no por el hex exacto, así que vale
+  igual un rojo pleno que un rosa claro o un granate. Los colores que no son
+  rojos no se descartan en silencio: el informe los lista con su recuento,
+  para que se vea qué se ha dejado fuera.
+
+### Modos
+
+- **Combinar** (por defecto): inserta lo que falta y deja intacto lo que ya
+  existe, emparejando por (fecha, tipo). Repetir la importación no duplica
+  nada.
+- **Reemplazar**: vacía la tabla antes de insertar. Pide confirmación.
+
+El botón **Analizar** hace una pasada en seco: enseña el informe completo
+—cuántos registros de cada tipo, el rango de fechas, las filas descartadas—
+sin escribir nada en la base de datos.
+
+### Desde la consola
+
+```bash
+# Vista previa, sin tocar los datos
+docker compose exec kiki-app python tools/import_file.py /app/data/Kiki.xlsx --simular
+
+# Importar de verdad
+docker compose exec kiki-app python tools/import_file.py /app/data/Kiki.xlsx
 ```
-id | fecha | tipo | pretexto | motivacion | calidad | tiempo | observaciones
-```
-
-Al importar se aceptan variantes de cabecera habituales —`Día`, `Categoría`,
-`Motivo`, `Iniciativa`, `Nota`, `Duración`, `Comentarios`…— sin distinguir
-mayúsculas ni acentos, y las fechas valen en ISO, `dd/mm/aaaa`, `dd-mm-aa` o
-como número de serie de Sheets.
-
-### Dar de alta la Cuenta de Servicio
-
-1. En [Google Cloud Console](https://console.cloud.google.com/), crea un
-   proyecto y activa **Google Sheets API** y **Google Drive API**.
-2. **IAM y administración → Cuentas de servicio → Crear**. No necesita
-   ningún rol de IAM.
-3. En la cuenta creada: **Claves → Añadir clave → Crear nueva → JSON**.
-   Guarda el fichero como `credentials.json` en la raíz del proyecto.
-4. Abre tu hoja en Drive y **compártela como Editor** con el correo de la
-   cuenta de servicio (`...@....iam.gserviceaccount.com`).
-5. Descomenta el montaje de `credentials.json` en `docker-compose.yml`, pon
-   `SYNC_ENABLED=true` y levanta el stack.
-
-`credentials.json` está en `.gitignore`: no acaba nunca en el repositorio.
 
 ---
 
@@ -199,8 +202,8 @@ FastAPI).
 | `GET` | `/api/stats/yearly` | Serie histórica por año. |
 | `GET` | `/api/stats/breakdown` | Reparto por motivación y por pretexto. |
 | `GET` | `/api/stats/calendar` | Eventos agrupados por día. |
-| `GET` | `/api/sync` | Estado de la sincronización. |
-| `POST` | `/api/sync?direction=both\|pull\|push` | Fuerza una sincronización. |
+| `GET` | `/api/import` | Cuándo fue la última importación. |
+| `POST` | `/api/import` | Sube un `.xlsx` o `.csv` (multipart: `archivo`, `modo`, `simular`). |
 | `GET` | `/api/health` | Estado del servicio (lo usa el healthcheck). |
 
 Filtros aceptados por los endpoints de listado y estadísticas: `year`,
@@ -280,10 +283,9 @@ app/
 ├── crud.py              Consultas y escrituras sobre `events`
 ├── stats.py             KPIs, series, sequías y métricas de ciclo
 ├── schemas.py           Modelos Pydantic y vocabulario del dominio
-├── routers/             events · statistics · sync
+├── routers/             events · statistics · importer
 └── services/
-    ├── sheets.py        Pasarela gspread y normalización de filas
-    └── sync.py          Orquestación pull/push y tareas en segundo plano
+    └── importer.py      Lectura de .xlsx/.csv y de los calendarios por color
 
 frontend/app.css         Fuente de Tailwind (tokens y componentes)
 templates/               dashboard.html · mobile.html
@@ -294,7 +296,7 @@ static/
 ├── icons/               SVG fuente y PNG generados
 ├── manifest.webmanifest
 └── sw.js                Service Worker
-tools/                   seed.py · vendor.mjs · icons.mjs
+tools/                   import_file.py · seed.py · vendor.mjs · icons.mjs
 tests/                   Suite de pytest
 ```
 
@@ -315,9 +317,15 @@ en tabla a un clic, los tipos llevan etiqueta de texto junto al punto de
 color, y la tinta de las celdas coloreadas se calcula contra el relleno real
 para que siempre supere el contraste.
 
-**SQLite primero, Sheets después.** Toda lectura se responde en local. La
-sincronización va en segundo plano y, si falla, la app sigue funcionando y lo
-dice en la cabecera en lugar de bloquear la escritura.
+**Una sola fuente de verdad.** La app manda; la hoja de cálculo fue el punto
+de partida, no un espejo permanente. Eso elimina toda una clase de problemas
+—conflictos de escritura, credenciales, cuotas de API, fallos de red— a
+cambio de un importador que se usa una vez.
+
+**Nada se descarta en silencio.** El informe de importación dice qué pestaña
+se ha usado, cuántas filas se han descartado y qué colores de calendario no
+se han interpretado como Marea. Si el fichero trae algo que el importador no
+entiende, se ve.
 
 **Sin build de JavaScript.** Alpine.js para la reactividad y Chart.js para los
 gráficos, cargados como scripts. No hay bundler, ni paso de transpilación, ni

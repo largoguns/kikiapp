@@ -31,7 +31,6 @@ function dashboard() {
   return {
     Kiki: K,
     cargando: false,
-    sincronizando: false,
 
     filtros: {
       year: String(new Date().getFullYear()),
@@ -71,7 +70,15 @@ function dashboard() {
     tablas: {},
     vistaTabla: {},
 
-    sync: { enabled: false, configured: false, last_error: null },
+    ultimaImportacion: null,
+    importacion: {
+      abierto: false,
+      archivo: null,
+      modo: 'combinar',
+      informe: null,
+      error: '',
+      enviando: false,
+    },
     modal: { abierto: false, id: null, form: FORM_VACIO(), error: '', guardando: false, delDia: [] },
     aviso: { texto: '', tipo: 'info' },
 
@@ -80,7 +87,7 @@ function dashboard() {
       window.KikiCharts.aplicarTema(window.Chart);
       await this.cargarOpciones();
       await this.recargar();
-      await this.cargarSync();
+      await this.cargarImportacion();
       window.addEventListener('resize', () => this.redibujar());
     },
 
@@ -449,37 +456,60 @@ function dashboard() {
       }
     },
 
-    // --- sincronización ---------------------------------------------------
-    get estadoSync() {
-      if (!this.sync.enabled) return 'Sync desactivada';
-      if (!this.sync.configured) return 'Sheets sin configurar';
-      if (this.sync.last_error) return `Error: ${this.sync.last_error}`;
-      if (!this.sync.last_sync_at) return 'Sheets listo';
-      return `Sync ${K.fechaCorta(this.sync.last_sync_at.slice(0, 10))}`;
-    },
-
-    async cargarSync() {
+    // --- importación ------------------------------------------------------
+    async cargarImportacion() {
       try {
-        this.sync = await K.api.get('/api/sync');
+        const estado = await K.api.get('/api/import');
+        this.ultimaImportacion = estado.ultima_importacion;
       } catch (error) {
-        this.sync = { enabled: false, configured: false, last_error: error.message };
+        this.ultimaImportacion = null;
       }
     },
 
-    async sincronizar() {
-      this.sincronizando = true;
+    abrirImportacion() {
+      this.importacion = {
+        abierto: true, archivo: null, modo: 'combinar',
+        informe: null, error: '', enviando: false,
+      };
+    },
+
+    elegirArchivo(evento) {
+      this.importacion.archivo = evento.target.files[0] || null;
+      this.importacion.informe = null;
+      this.importacion.error = '';
+    },
+
+    async enviarImportacion(simular) {
+      if (!this.importacion.archivo) return;
+      if (!simular && this.importacion.modo === 'reemplazar') {
+        const aviso = 'Esto BORRA todos los registros actuales antes de importar. '
+          + '¿Continuar?';
+        if (!window.confirm(aviso)) return;
+      }
+
+      this.importacion.enviando = true;
+      this.importacion.error = '';
+      const cuerpo = new FormData();
+      cuerpo.append('archivo', this.importacion.archivo);
+      cuerpo.append('modo', this.importacion.modo);
+      cuerpo.append('simular', simular ? 'true' : 'false');
+
       try {
-        const resultado = await K.api.post('/api/sync', {});
-        this.sync = resultado;
-        this.notificar(
-          resultado.ok ? `Sincronizado: ${resultado.last_result}` : resultado.last_error,
-          resultado.ok ? 'info' : 'error'
-        );
-        if (resultado.ok) await this.recargar();
+        const respuesta = await fetch('/api/import', { method: 'POST', body: cuerpo });
+        const datos = await respuesta.json();
+        if (!respuesta.ok) throw new Error(datos.detail || `Error ${respuesta.status}`);
+        this.importacion.informe = datos;
+        if (!simular) {
+          this.notificar(`${datos.insertadas} registros importados`);
+          this.ultimaImportacion = null;
+          await this.cargarImportacion();
+          await this.cargarOpciones();
+          await this.recargar();
+        }
       } catch (error) {
-        this.notificar(error.message, 'error');
+        this.importacion.error = error.message;
       } finally {
-        this.sincronizando = false;
+        this.importacion.enviando = false;
       }
     },
 

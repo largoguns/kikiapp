@@ -36,19 +36,5 @@ try:
 except (ZoneInfoNotFoundError, ValueError):
     LOCAL_TZ = ZoneInfo("UTC")
 
-# --- Google Sheets ---------------------------------------------------------
-GOOGLE_SHEETS_CREDENTIALS_FILE = Path(
-    os.getenv("GOOGLE_SHEETS_CREDENTIALS_FILE", BASE_DIR / "credentials.json")
-)
-GOOGLE_SHEET_NAME = os.getenv("GOOGLE_SHEET_NAME", "Kiki")
-GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID", "").strip()
-GOOGLE_WORKSHEET_NAME = os.getenv("GOOGLE_WORKSHEET_NAME", "Kikis")
-
-SYNC_ENABLED = _env_bool("SYNC_ENABLED", True)
-SYNC_ON_STARTUP = _env_bool("SYNC_ON_STARTUP", True)
-SYNC_INTERVAL_MINUTES = _env_int("SYNC_INTERVAL_MINUTES", 360)
-# Espera antes de empujar a la hoja tras una escritura, para agrupar ráfagas.
-SYNC_PUSH_DEBOUNCE_SECONDS = _env_int("SYNC_PUSH_DEBOUNCE_SECONDS", 5)
-
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)

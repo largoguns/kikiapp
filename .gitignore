@@ -8,6 +8,12 @@ __pycache__/
 node_modules/
 
 # Datos y secretos
+# El libro original lleva datos personales: se importa, no se versiona.
+Kiki.xlsx
+*.xlsx
+*.csv
+# Marcador de procedencia que WSL expone al copiar desde Windows.
+*:Zone.Identifier
 data/
 *.db
 *.db-wal

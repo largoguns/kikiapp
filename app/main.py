@@ -12,9 +12,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app import config, crud, db
-from app.routers import events, statistics
-from app.routers import sync as sync_router
-from app.services.sync import manager as sync_manager
+from app.routers import events, importer, statistics
+from app.services import importer as importer_service
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,9 +31,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 async def lifespan(_: FastAPI):
     db.init_db()
     logger.info("Base de datos lista en %s", config.DB_PATH)
-    await sync_manager.start()
     yield
-    await sync_manager.stop()
 
 
 app = FastAPI(
@@ -46,7 +43,7 @@ app = FastAPI(
 
 app.include_router(events.router)
 app.include_router(statistics.router)
-app.include_router(sync_router.router)
+app.include_router(importer.router)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
@@ -99,6 +96,6 @@ def health() -> Any:
             "version": config.APP_VERSION,
             "registros": crud.count_events(),
             "timezone": config.TIMEZONE,
-            "sync": sync_manager.status(),
+            "ultima_importacion": importer_service.ultima_importacion(),
         }
     )

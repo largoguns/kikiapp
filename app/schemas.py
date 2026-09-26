@@ -94,15 +94,3 @@ class Options(BaseModel):
     pretextos: list[str]
     years: list[int]
 
-
-class SyncStatus(BaseModel):
-    enabled: bool
-    configured: bool
-    running: bool
-    last_sync_at: Optional[str] = None
-    last_result: Optional[str] = None
-    last_error: Optional[str] = None
-    pulled: int = 0
-    pushed: int = 0
-    sheet: Optional[str] = None
-    interval_minutes: int = 0

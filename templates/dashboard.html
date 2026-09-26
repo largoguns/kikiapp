@@ -26,17 +26,10 @@
     </div>
 
     <div class="flex flex-wrap items-center gap-2">
-      <!-- Estado de la sincronización con Google Sheets -->
-      <div class="flex items-center gap-2 rounded-xl border border-hairline bg-surface px-3 py-2">
-        <span class="h-2 w-2 flex-none rounded-full"
-              :class="sync.configured ? (sync.last_error ? 'bg-critical' : 'bg-kiki') : 'bg-ink-3'"
-              :title="estadoSync"></span>
-        <span class="text-xs text-ink-2" x-text="estadoSync"></span>
-      </div>
-      <button class="btn btn-ghost" @click="sincronizar()" :disabled="sincronizando">
-        <span x-show="!sincronizando">Forzar sincronización</span>
-        <span x-show="sincronizando">Sincronizando…</span>
-      </button>
+      <span class="text-xs text-ink-3" x-show="ultimaImportacion"
+            :title="ultimaImportacion"
+            x-text="'Importado el ' + Kiki.fechaCorta((ultimaImportacion || '').slice(0, 10))"></span>
+      <button class="btn btn-ghost" @click="abrirImportacion()">Importar histórico</button>
       <a href="/m" class="btn btn-ghost">Vista móvil</a>
       <button class="btn btn-primary" @click="nuevoRegistro()">+ Nuevo registro</button>
     </div>
@@ -490,6 +483,117 @@
               <button class="text-ink-3 hover:text-ink" @click="editarRegistro(item)">Editar</button>
             </div>
           </template>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══ Modal de importación ══════════════════════════════════════════════ -->
+  <div x-show="importacion.abierto" x-transition.opacity
+       class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm"
+       @keydown.escape.window="importacion.abierto = false">
+    <div class="card mt-10 w-full max-w-2xl" role="dialog" aria-modal="true">
+      <div class="mb-4 flex items-center justify-between">
+        <div>
+          <h2 class="text-base font-semibold">Importar histórico</h2>
+          <p class="card-hint">Un fichero <code>.xlsx</code> o <code>.csv</code>. Se lee todo en local.</p>
+        </div>
+        <button class="btn btn-ghost px-2 py-1" @click="importacion.abierto = false"
+                aria-label="Cerrar">✕</button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="label" for="i-archivo">Fichero</label>
+          <input id="i-archivo" type="file" accept=".xlsx,.xlsm,.csv,.tsv"
+                 class="field file:mr-3 file:rounded-lg file:border-0 file:bg-surface-3 file:px-3 file:py-1.5 file:text-sm file:text-ink"
+                 @change="elegirArchivo($event)">
+        </div>
+
+        <div>
+          <span class="label">Modo</span>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" class="btn"
+                    :class="importacion.modo === 'combinar' ? 'bg-surface-3 text-ink' : 'btn-ghost'"
+                    @click="importacion.modo = 'combinar'; importacion.informe = null">
+              Combinar
+            </button>
+            <button type="button" class="btn"
+                    :class="importacion.modo === 'reemplazar' ? 'bg-surface-3 text-ink' : 'btn-ghost'"
+                    @click="importacion.modo = 'reemplazar'; importacion.informe = null">
+              Reemplazar
+            </button>
+          </div>
+          <p class="card-hint mt-1.5"
+             x-text="importacion.modo === 'combinar'
+               ? 'Añade lo que falte y deja intacto lo que ya existe. Repetirlo no duplica nada.'
+               : 'Borra TODOS los registros actuales antes de importar. No tiene vuelta atrás.'"
+             :class="importacion.modo === 'reemplazar' ? 'text-critical' : ''"></p>
+        </div>
+
+        <!-- Informe del análisis -->
+        <template x-if="importacion.informe">
+          <div class="space-y-3 rounded-xl border border-hairline bg-surface-2 p-4">
+            <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
+              <span class="font-semibold"
+                    x-text="importacion.informe.simulado ? 'Vista previa' : 'Importación completada'"></span>
+              <span class="card-hint">
+                Pestaña de datos: <span class="text-ink-2" x-text="importacion.informe.hoja_datos || '—'"></span>
+              </span>
+              <span class="card-hint">
+                <span x-text="Kiki.fechaCorta(importacion.informe.rango.desde)"></span> →
+                <span x-text="Kiki.fechaCorta(importacion.informe.rango.hasta)"></span>
+              </span>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2">
+              <template x-for="tipo in Kiki.TIPOS" :key="tipo">
+                <div class="rounded-lg bg-surface px-3 py-2">
+                  <div class="flex items-center gap-1.5">
+                    <span class="h-2 w-2 rounded-full"
+                          :style="`background:${Kiki.COLOR_POR_TIPO[tipo]}`"></span>
+                    <span class="text-[11px] text-ink-3" x-text="tipo"></span>
+                  </div>
+                  <p class="text-xl font-semibold" x-text="importacion.informe.por_tipo[tipo]"></p>
+                </div>
+              </template>
+            </div>
+
+            <div class="flex flex-wrap gap-x-5 gap-y-1 text-xs text-ink-2">
+              <span>Leídas: <span class="text-ink" x-text="importacion.informe.leidas"></span></span>
+              <span>Nuevas: <span class="text-ink" x-text="importacion.informe.nuevas"></span></span>
+              <span>Ya existentes: <span class="text-ink" x-text="importacion.informe.ya_existentes"></span></span>
+              <span x-show="!importacion.informe.simulado">
+                Insertadas: <span class="text-kiki" x-text="importacion.informe.insertadas"></span>
+              </span>
+              <span x-show="importacion.informe.mareas_del_calendario">
+                Mareas leídas de los calendarios:
+                <span class="text-marea" x-text="importacion.informe.mareas_del_calendario"></span>
+              </span>
+            </div>
+
+            <p class="card-hint" x-show="importacion.informe.total_descartadas">
+              <span x-text="importacion.informe.total_descartadas"></span> filas descartadas por no tener fecha válida.
+            </p>
+            <p class="card-hint" x-show="Object.keys(importacion.informe.colores_ignorados || {}).length">
+              Colores de calendario no interpretados como Marea:
+              <span x-text="Object.entries(importacion.informe.colores_ignorados)
+                .map(([color, veces]) => `${color} (${veces})`).join(', ')"></span>
+            </p>
+          </div>
+        </template>
+
+        <p class="text-sm text-critical" x-show="importacion.error" x-text="importacion.error"></p>
+
+        <div class="flex justify-end gap-2">
+          <button class="btn btn-ghost" @click="importacion.abierto = false">Cerrar</button>
+          <button class="btn btn-ghost" @click="enviarImportacion(true)"
+                  :disabled="!importacion.archivo || importacion.enviando">Analizar</button>
+          <button class="btn btn-primary" @click="enviarImportacion(false)"
+                  :disabled="!importacion.archivo || importacion.enviando">
+            <span x-text="importacion.enviando ? 'Importando…' : 'Importar'"></span>
+          </button>
         </div>
       </div>
     </div>
