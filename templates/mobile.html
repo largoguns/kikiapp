@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+  <title>{{ app_name }}</title>
+  <meta name="theme-color" content="#0d0d10">
+  <meta name="color-scheme" content="dark">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Kiki">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/static/icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link rel="stylesheet" href="/static/css/app.css?v={{ version }}">
+</head>
+<body class="min-h-screen bg-plane text-ink antialiased select-none">
+
+<div x-data="movil()" x-init="init()" x-cloak
+     class="mx-auto flex min-h-screen max-w-md flex-col"
+     style="padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);">
+
+  <!-- ══ Cabecera ══ -->
+  <header class="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-hairline bg-plane/95 px-4 py-3 backdrop-blur">
+    <div class="flex items-center gap-2.5">
+      <img src="/static/icons/favicon.svg" alt="" class="h-8 w-8" width="32" height="32">
+      <div>
+        <p class="text-sm font-semibold leading-tight">Kiki</p>
+        <p class="text-[11px] leading-tight text-ink-3">
+          <span x-show="pendientes.length" class="text-warning"
+                x-text="`${pendientes.length} sin enviar`"></span>
+          <span x-show="!pendientes.length" x-text="conexion ? 'En línea' : 'Sin conexión'"></span>
+        </p>
+      </div>
+    </div>
+    <div class="text-right">
+      <p class="text-[11px] uppercase tracking-wider text-ink-3">Días sin Kiki</p>
+      <p class="text-2xl font-semibold leading-none"
+         :class="(kpi.dias_sin_kiki ?? 0) > 14 ? 'text-nokiki' : 'text-kiki'"
+         x-text="kpi.dias_sin_kiki ?? '—'"></p>
+    </div>
+  </header>
+
+  <!-- ══ Pestañas ══ -->
+  <nav class="flex gap-1 px-4 pt-3">
+    <button class="btn flex-1 py-2.5"
+            :class="pestana === 'registrar' ? 'bg-surface-3 text-ink' : 'btn-ghost'"
+            @click="pestana = 'registrar'">Registrar</button>
+    <button class="btn flex-1 py-2.5"
+            :class="pestana === 'historial' ? 'bg-surface-3 text-ink' : 'btn-ghost'"
+            @click="pestana = 'historial'; cargarHistorial()">Historial</button>
+  </nav>
+
+  <!-- ══ Formulario rápido ══ -->
+  <main x-show="pestana === 'registrar'" class="flex-1 space-y-5 px-4 py-4">
+
+    <!-- Fecha -->
+    <section>
+      <span class="label">Fecha</span>
+      <div class="flex gap-2">
+        <button type="button" class="btn flex-1 py-3"
+                :class="form.fecha === Kiki.hoyISO() ? 'bg-surface-3 text-ink' : 'btn-ghost'"
+                @click="form.fecha = Kiki.hoyISO()">Hoy</button>
+        <button type="button" class="btn flex-1 py-3"
+                :class="form.fecha === ayer ? 'bg-surface-3 text-ink' : 'btn-ghost'"
+                @click="form.fecha = ayer">Ayer</button>
+        <input type="date" class="field flex-1 text-center" x-model="form.fecha" aria-label="Otra fecha">
+      </div>
+    </section>
+
+    <!-- Tipo: el control principal, a un toque -->
+    <section>
+      <span class="label">Tipo</span>
+      <div class="grid grid-cols-3 gap-2">
+        <template x-for="tipo in Kiki.TIPOS" :key="tipo">
+          <button type="button"
+                  class="btn flex-col gap-1 rounded-2xl py-5 text-sm"
+                  :class="form.tipo === tipo ? '' : 'btn-ghost'"
+                  :style="form.tipo === tipo
+                    ? `background:${Kiki.COLOR_POR_TIPO[tipo]}; color:${Kiki.tintaSobre(Kiki.COLOR_POR_TIPO[tipo])}`
+                    : ''"
+                  @click="form.tipo = tipo">
+            <span class="h-2.5 w-2.5 rounded-full"
+                  :style="`background:${form.tipo === tipo ? 'currentColor' : Kiki.COLOR_POR_TIPO[tipo]}`"></span>
+            <span x-text="tipo"></span>
+          </button>
+        </template>
+      </div>
+    </section>
+
+    <!-- Valoraciones: sólo tienen sentido en un Kiki -->
+    <template x-if="form.tipo === 'Kiki'">
+      <div class="space-y-5">
+        <section>
+          <div class="flex items-baseline justify-between">
+            <span class="label">Calidad</span>
+            <span class="text-sm font-semibold text-ink-2" x-text="`${form.calidad} / 4`"></span>
+          </div>
+          <div class="flex gap-2">
+            <template x-for="nivel in [0,1,2,3,4]" :key="nivel">
+              <button type="button" class="btn flex-1 rounded-xl py-4 text-base"
+                      :class="form.calidad === nivel ? '' : 'btn-ghost'"
+                      :style="form.calidad === nivel
+                        ? `background:${Kiki.intensidadKiki(nivel)}; color:${Kiki.tintaSobre(Kiki.intensidadKiki(nivel), '#0d0d10')}; border-color:transparent`
+                        : ''"
+                      @click="form.calidad = nivel" x-text="nivel"></button>
+            </template>
+          </div>
+        </section>
+
+        <section>
+          <div class="flex items-baseline justify-between">
+            <span class="label">Tiempo</span>
+            <span class="text-sm font-semibold text-ink-2" x-text="`${form.tiempo} / 4`"></span>
+          </div>
+          <div class="flex gap-2">
+            <template x-for="nivel in [0,1,2,3,4]" :key="nivel">
+              <button type="button" class="btn flex-1 rounded-xl py-4 text-base"
+                      :class="form.tiempo === nivel ? '' : 'btn-ghost'"
+                      :style="form.tiempo === nivel
+                        ? 'background:#9085e9; color:#0d0d10; border-color:transparent'
+                        : ''"
+                      @click="form.tiempo = nivel" x-text="nivel"></button>
+            </template>
+          </div>
+        </section>
+      </div>
+    </template>
+
+    <!-- Motivación y pretexto -->
+    <template x-if="form.tipo !== 'Marea'">
+      <div class="space-y-5">
+        <section>
+          <span class="label">Motivación</span>
+          <div class="grid grid-cols-3 gap-2">
+            <template x-for="item in opciones.motivaciones" :key="item">
+              <button type="button" class="btn rounded-xl py-3"
+                      :class="form.motivacion === item ? 'bg-surface-3 text-ink' : 'btn-ghost'"
+                      @click="form.motivacion = form.motivacion === item ? '' : item"
+                      x-text="item"></button>
+            </template>
+          </div>
+        </section>
+
+        <section>
+          <span class="label">Pretexto</span>
+          <input class="field py-3" list="pretextos-movil" x-model="form.pretexto"
+                 placeholder="Desatranque, Cumpleaños…" enterkeyhint="done">
+          <datalist id="pretextos-movil">
+            <template x-for="item in opciones.pretextos" :key="item">
+              <option :value="item"></option>
+            </template>
+          </datalist>
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            <template x-for="item in opciones.pretextos.slice(0, 6)" :key="item">
+              <button type="button" class="btn btn-ghost px-2.5 py-1 text-xs"
+                      @click="form.pretexto = item" x-text="item"></button>
+            </template>
+          </div>
+        </section>
+      </div>
+    </template>
+
+    <section>
+      <span class="label">Observaciones</span>
+      <textarea class="field" rows="3" x-model="form.observaciones"
+                placeholder="Opcional…"></textarea>
+    </section>
+
+    <p class="text-sm text-critical" x-show="error" x-text="error"></p>
+
+    <div class="flex gap-2 pb-2">
+      <button class="btn btn-ghost px-4 py-4" @click="reiniciar()">Limpiar</button>
+      <button class="btn btn-primary flex-1 py-4 text-base" @click="guardar()"
+              :disabled="guardando">
+        <span x-text="guardando ? 'Guardando…' : 'Guardar registro'"></span>
+      </button>
+    </div>
+
+    <a href="/?desktop=1" class="block pb-6 text-center text-xs text-ink-3 underline">
+      Abrir dashboard completo
+    </a>
+  </main>
+
+  <!-- ══ Historial ══ -->
+  <main x-show="pestana === 'historial'" class="flex-1 space-y-2 px-4 py-4">
+    <div class="mb-3 grid grid-cols-3 gap-2 text-center">
+      <div class="card px-2 py-3">
+        <p class="text-[11px] text-ink-3">Kikis mes</p>
+        <p class="text-xl font-semibold text-kiki" x-text="kpi.kikis_mes_actual ?? '—'"></p>
+      </div>
+      <div class="card px-2 py-3">
+        <p class="text-[11px] text-ink-3">Kikis año</p>
+        <p class="text-xl font-semibold text-kiki" x-text="kpi.kikis_anio_actual ?? '—'"></p>
+      </div>
+      <div class="card px-2 py-3">
+        <p class="text-[11px] text-ink-3">Última marea</p>
+        <p class="text-sm font-semibold text-marea"
+           x-text="Kiki.fechaCorta(kpi.ultima_marea)"></p>
+      </div>
+    </div>
+
+    <template x-for="registro in historial" :key="registro.id">
+      <div class="flex items-center gap-3 rounded-xl border border-hairline bg-surface px-3 py-3">
+        <span class="h-9 w-1.5 flex-none rounded-full"
+              :style="`background:${registro.tipo === 'Kiki'
+                ? Kiki.intensidadKiki(Math.max(registro.calidad, registro.tiempo))
+                : Kiki.COLOR_POR_TIPO[registro.tipo]}`"></span>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-semibold" x-text="registro.tipo"></span>
+            <span class="text-xs text-ink-3" x-text="Kiki.fechaCorta(registro.fecha)"></span>
+            <span class="text-xs text-ink-3" x-show="registro.tipo === 'Kiki'"
+                  x-text="`C${registro.calidad} · T${registro.tiempo}`"></span>
+          </div>
+          <p class="truncate text-xs text-ink-3"
+             x-text="[registro.pretexto, registro.motivacion, registro.observaciones]
+                      .filter(Boolean).join(' · ') || '—'"></p>
+        </div>
+        <button class="btn btn-ghost px-2 py-1 text-xs" @click="borrar(registro)">✕</button>
+      </div>
+    </template>
+
+    <p x-show="!historial.length" class="py-10 text-center text-sm text-ink-3">
+      Todavía no hay registros.
+    </p>
+  </main>
+
+  <!-- Aviso -->
+  <div x-show="aviso" x-transition
+       class="pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-hairline bg-surface px-4 py-2.5 text-sm shadow-lg"
+       x-text="aviso"></div>
+</div>
+
+<script src="/static/js/core.js?v={{ version }}"></script>
+<script src="/static/js/mobile.js?v={{ version }}"></script>
+<script defer src="/static/vendor/alpine.min.js?v={{ version }}"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+  }
+</script>
+</body>
+</html>

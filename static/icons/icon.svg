@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Kiki App">
+  <rect width="512" height="512" rx="112" fill="#14141a"/>
+  <circle cx="196" cy="256" r="118" fill="#199e70" opacity="0.92"/>
+  <circle cx="316" cy="256" r="118" fill="#9085e9" opacity="0.82"/>
+</svg>

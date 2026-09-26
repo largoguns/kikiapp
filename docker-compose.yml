@@ -1,0 +1,35 @@
+services:
+  kiki-app:
+    build: .
+    image: kiki-app:latest
+    container_name: kiki_app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - TZ=Europe/Madrid
+      # --- Google Sheets -------------------------------------------------
+      # Pon SYNC_ENABLED=true y monta credentials.json para activar la
+      # sincronización. Sin credenciales la app funciona sólo en local.
+      - SYNC_ENABLED=false
+      - GOOGLE_SHEETS_CREDENTIALS_FILE=/app/credentials.json
+      - GOOGLE_SHEET_NAME=Kiki
+      - GOOGLE_WORKSHEET_NAME=Kikis
+      - SYNC_INTERVAL_MINUTES=360
+      - SYNC_ON_STARTUP=true
+    volumes:
+      - kiki_data:/app/data
+      # Descomenta cuando tengas el fichero de la Cuenta de Servicio.
+      # El fichero DEBE existir antes de levantar el contenedor: si no,
+      # Docker crea un directorio con ese nombre.
+      # - ./credentials.json:/app/credentials.json:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  kiki_data:

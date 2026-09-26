@@ -1,0 +1,17 @@
+.git
+.gitignore
+.venv
+node_modules
+data
+frontend
+tests
+*.md
+!README.md
+package.json
+package-lock.json
+credentials.json
+.env
+__pycache__
+**/__pycache__
+*.pyc
+.pytest_cache

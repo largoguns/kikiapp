@@ -1,0 +1,19 @@
+{
+  "name": "kiki-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Assets de Kiki App: Tailwind CSS compilado y librerías vendorizadas.",
+  "scripts": {
+    "build:css": "tailwindcss -i ./frontend/app.css -o ./static/css/app.css --minify",
+    "watch:css": "tailwindcss -i ./frontend/app.css -o ./static/css/app.css --watch",
+    "vendor": "node tools/vendor.mjs",
+    "build": "npm run build:css && npm run vendor"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.0",
+    "alpinejs": "^3.14.0",
+    "chart.js": "^4.4.0",
+    "sharp": "^0.35.4",
+    "tailwindcss": "^4.1.0"
+  }
+}
