@@ -1,7 +1,15 @@
 services:
   kiki-app:
-    build: .
+    # La imagen se construye siempre a partir del código de este repositorio.
+    # No hay nada publicado en Docker Hub ni en ningún otro registro.
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Sólo es la etiqueta local que recibe la imagen recién construida,
+    # no una imagen que se descargue de fuera.
     image: kiki-app:latest
+    # Fuerza construir en lugar de intentar descargar, también en Portainer.
+    pull_policy: build
     container_name: kiki_app
     restart: unless-stopped
     ports:

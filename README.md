@@ -48,6 +48,13 @@ reconstrucciones de la imagen.
    (ver [Configuración](#configuración)).
 4. **Deploy the stack**.
 
+La imagen **se construye en el propio servidor** a partir del código del
+repositorio: no hay nada publicado en Docker Hub ni en ningún otro registro.
+El `image: kiki-app:latest` del compose es sólo la etiqueta local que recibe
+la imagen recién construida, y `pull_policy: build` obliga a reconstruirla en
+lugar de intentar descargarla. Para desplegar una versión nueva basta con
+hacer push al repositorio y pulsar **Update the stack** en Portainer.
+
 Para activar la sincronización con Google Sheets hace falta, además, que el
 fichero `credentials.json` exista en el host antes de levantar el stack y
 descomentar su línea en `docker-compose.yml`.
