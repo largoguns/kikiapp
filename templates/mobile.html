@@ -178,6 +178,27 @@
       </div>
     </template>
 
+    <!-- Qué pasó: etiquetas, sólo en el Kiki -->
+    <template x-if="form.tipo === 'Kiki'">
+      <section>
+        <div class="flex items-baseline justify-between">
+          <span class="label">Qué pasó</span>
+          <span class="mb-1.5 text-xs text-ink-3" x-show="form.tags.length"
+                x-text="form.tags.length === 1
+                      ? '1 seleccionada' : `${form.tags.length} seleccionadas`"></span>
+        </div>
+        <div class="max-h-44 overflow-y-auto rounded-xl border border-hairline bg-surface-2/40 p-2">
+          <div class="flex flex-wrap gap-1.5">
+            <template x-for="etiqueta in opciones.tags" :key="etiqueta">
+              <button type="button" class="tag px-3 py-2 text-sm"
+                      :aria-pressed="tagActivo(etiqueta)"
+                      @click="alternarTag(etiqueta)" x-text="etiqueta"></button>
+            </template>
+          </div>
+        </div>
+      </section>
+    </template>
+
     <section>
       <span class="label">Observaciones</span>
       <textarea class="field" rows="3" x-model="form.observaciones"
@@ -231,7 +252,8 @@
                   x-text="`C${registro.calidad} · T${registro.tiempo}`"></span>
           </div>
           <p class="truncate text-xs text-ink-3"
-             x-text="[registro.pretexto, registro.motivacion, registro.observaciones]
+             x-text="[registro.pretexto, registro.motivacion,
+                      (registro.tags || []).join(', '), registro.observaciones]
                       .filter(Boolean).join(' · ') || '—'"></p>
         </div>
         <button class="btn btn-ghost px-2 py-1 text-xs" @click="borrar(registro)">✕</button>

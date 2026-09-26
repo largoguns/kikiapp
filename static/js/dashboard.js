@@ -28,6 +28,7 @@ function dashboard() {
     calidad: 3,
     tiempo: 2,
     observaciones: '',
+    tags: [],
   });
 
   return {
@@ -41,9 +42,10 @@ function dashboard() {
       pretexto: '',
       min_calidad: '',
       min_tiempo: '',
+      tag: '',
       q: '',
     },
-    opciones: { tipos: K.TIPOS, motivaciones: [], pretextos: [], years: [] },
+    opciones: { tipos: K.TIPOS, motivaciones: [], pretextos: [], tags: [], years: [] },
 
     resumen: RESUMEN_VACIO,
     meses: [],
@@ -66,8 +68,10 @@ function dashboard() {
       { campo: 'motivacion', titulo: 'Motivación' },
       { campo: 'calidad', titulo: 'Calidad' },
       { campo: 'tiempo', titulo: 'Tiempo' },
+      { campo: 'tags', titulo: 'Etiquetas', ordenable: false },
       { campo: 'observaciones', titulo: 'Observaciones' },
     ],
+    nuevaEtiqueta: '',
 
     tablas: {},
     vistaTabla: {},
@@ -104,6 +108,7 @@ function dashboard() {
             pretexto: filtros.pretexto,
             min_calidad: filtros.min_calidad,
             min_tiempo: filtros.min_tiempo,
+            tag: filtros.tag,
             q: filtros.q,
           },
           extra || {}
@@ -198,7 +203,7 @@ function dashboard() {
     limpiarFiltros() {
       this.filtros = {
         year: '', tipo: '', motivacion: '', pretexto: '',
-        min_calidad: '', min_tiempo: '', q: '',
+        min_calidad: '', min_tiempo: '', tag: '', q: '',
       };
       this.recargar();
     },
@@ -206,6 +211,9 @@ function dashboard() {
     // --- gráficos ---------------------------------------------------------
     get tarjetasGrafico() {
       const ambito = this.etiquetaAmbito;
+      // Sin ninguna etiqueta puesta, un gráfico de etiquetas sólo sería un
+      // eje vacío: la tarjeta no aparece hasta que hay algo que contar.
+      const hayEtiquetas = (this.reparto.tags || []).length > 0;
       return [
         { id: 'mensual', titulo: `Evolución mensual · ${this.anioCalendario}`,
           subtitulo: 'Encuentros por mes · la Marea se ve en el calendario' },
@@ -217,6 +225,11 @@ function dashboard() {
           subtitulo: `De quién surgió la iniciativa · sólo Kiki y No Kiki · ${ambito}` },
         { id: 'pretexto', titulo: 'Por pretexto',
           subtitulo: `Seis principales · sólo Kiki y No Kiki · ${ambito}` },
+        ...(hayEtiquetas ? [{
+          id: 'tags',
+          titulo: 'Por etiqueta',
+          subtitulo: `Qué se repite y con qué calidad · sólo Kiki · ${ambito}`,
+        }] : []),
         { id: 'semana', titulo: 'Por día de la semana',
           subtitulo: `Encuentros por día de la semana · ${ambito}` },
       ];
@@ -233,6 +246,7 @@ function dashboard() {
         ),
         motivacion: G.reparto(this.reparto.motivacion),
         pretexto: G.reparto(this.reparto.pretexto, 6),
+        tags: G.etiquetas(this.reparto.tags || [], 10),
         semana: G.semana(this.resumen.por_dia_semana),
       };
     },
@@ -374,6 +388,7 @@ function dashboard() {
 
     // --- registros --------------------------------------------------------
     nuevoRegistro(fecha) {
+      this.nuevaEtiqueta = '';
       this.modal = {
         abierto: true,
         id: null,
@@ -394,6 +409,7 @@ function dashboard() {
     },
 
     editarRegistro(registro) {
+      this.nuevaEtiqueta = '';
       this.modal = {
         abierto: true,
         id: registro.id,
@@ -407,6 +423,7 @@ function dashboard() {
           calidad: registro.calidad,
           tiempo: registro.tiempo,
           observaciones: registro.observaciones || '',
+          tags: [...(registro.tags || [])],
         },
         error: '',
         guardando: false,
@@ -419,6 +436,32 @@ function dashboard() {
       const form = this.modal.form;
       return !this.modal.id && form.rango && form.tipo === 'Marea'
         && !!form.hasta && form.hasta > form.fecha;
+    },
+
+    alternarTag(etiqueta) {
+      const actuales = this.modal.form.tags;
+      const indice = actuales.findIndex(
+        (item) => item.toLowerCase() === etiqueta.toLowerCase()
+      );
+      if (indice >= 0) actuales.splice(indice, 1);
+      else actuales.push(etiqueta);
+    },
+
+    tagActivo(etiqueta) {
+      return this.modal.form.tags.some(
+        (item) => item.toLowerCase() === etiqueta.toLowerCase()
+      );
+    },
+
+    anadirEtiqueta() {
+      const etiqueta = this.nuevaEtiqueta.trim();
+      if (!etiqueta) return;
+      if (!this.tagActivo(etiqueta)) this.modal.form.tags.push(etiqueta);
+      // Disponible en la lista aunque todavía no esté guardada en la BBDD.
+      if (!this.opciones.tags.some((t) => t.toLowerCase() === etiqueta.toLowerCase())) {
+        this.opciones.tags = [etiqueta, ...this.opciones.tags];
+      }
+      this.nuevaEtiqueta = '';
     },
 
     cerrarModal() {
@@ -437,6 +480,7 @@ function dashboard() {
         pretexto: form.pretexto || null,
         motivacion: form.motivacion || null,
         observaciones: form.observaciones || null,
+        tags: form.tags,
       };
       try {
         if (this.modal.id) {

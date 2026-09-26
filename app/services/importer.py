@@ -27,7 +27,8 @@ from datetime import date, datetime, timedelta
 from typing import Any, Iterable, Optional
 
 from app import crud, db
-from app.schemas import MOTIVACIONES, TIPOS_CON_CONTEXTO, TIPOS_PUNTUADOS
+from app.schemas import MOTIVACIONES, TIPOS_CON_CONTEXTO, TIPOS_CON_TAGS
+from app.schemas import TIPOS_PUNTUADOS
 from app.schemas import TIPO_GAYOLA, TIPO_KIKI, TIPO_MAREA, TIPO_NO_KIKI
 
 MAX_BYTES = 10 * 1024 * 1024
@@ -43,6 +44,7 @@ ALIAS_COLUMNA: dict[str, str] = {
     "tiempo": "tiempo", "duracion": "tiempo",
     "observaciones": "observaciones", "comentarios": "observaciones",
     "notas": "observaciones", "observacion": "observaciones",
+    "tags": "tags", "etiquetas": "tags", "practicas": "tags", "posturas": "tags",
 }
 
 ALIAS_TIPO: dict[str, str] = {
@@ -128,6 +130,15 @@ def _texto(valor: Any) -> Optional[str]:
     return limpio
 
 
+def _tags(valor: Any) -> list[str]:
+    """Una celda de etiquetas viene separada por comas, punto y coma o barras."""
+    texto = _texto(valor)
+    if not texto:
+        return []
+    partes = re.split(r"[,;/|]", texto)
+    return [parte.strip() for parte in partes if parte.strip()]
+
+
 def inferir_tipo(calidad: int, tiempo: int, explicito: Optional[str]) -> str:
     """Un 0 en ambas valoraciones marca el desencuentro en la hoja original."""
     if explicito:
@@ -170,6 +181,7 @@ def fila_a_registro(valores: list[Any], mapa: dict[int, str]) -> Optional[dict[s
     # Kiki y No Kiki llevan pretexto y motivación.
     puntuado = tipo in TIPOS_PUNTUADOS
     con_contexto = tipo in TIPOS_CON_CONTEXTO
+    con_tags = tipo in TIPOS_CON_TAGS
 
     return {
         "fecha": fecha,
@@ -179,6 +191,7 @@ def fila_a_registro(valores: list[Any], mapa: dict[int, str]) -> Optional[dict[s
         "calidad": calidad if puntuado else 0,
         "tiempo": tiempo if puntuado else 0,
         "observaciones": _texto(crudo.get("observaciones")),
+        "tags": _tags(crudo.get("tags")) if con_tags else [],
     }
 
 
@@ -450,6 +463,7 @@ CAMPOS_IDENTIDAD = (
 
 
 def _huella(registro: dict[str, Any]) -> tuple[Any, ...]:
+    """Las etiquetas no entran: se pueden editar sin dejar de ser el mismo evento."""
     return tuple(registro.get(campo) for campo in CAMPOS_IDENTIDAD)
 
 

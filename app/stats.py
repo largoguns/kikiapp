@@ -298,7 +298,35 @@ def breakdown(filters: Optional[EventFilters] = None) -> dict[str, Any]:
             salida.append(registro)
         return sorted(salida, key=lambda item: item["total"], reverse=True)
 
-    return {"motivacion": agrupar("motivacion"), "pretexto": agrupar("pretexto")}
+    return {
+        "motivacion": agrupar("motivacion"),
+        "pretexto": agrupar("pretexto"),
+        "tags": por_tags(filters),
+    }
+
+
+def por_tags(filters: Optional[EventFilters] = None) -> list[dict[str, Any]]:
+    """Cuántos Kikis lleva cada etiqueta y qué calidad media tienen.
+
+    Un registro suma en todas sus etiquetas, así que los totales no cuadran
+    con el número de Kikis: es un reparto por etiqueta, no una partición.
+    """
+    acumulado: dict[str, dict[str, Any]] = {}
+    for row in _fetch(filters):
+        for etiqueta in row.get("tags") or []:
+            registro = acumulado.setdefault(
+                etiqueta, {"clave": etiqueta, "total": 0, "_calidad": [], "_tiempo": []}
+            )
+            registro["total"] += 1
+            registro["_calidad"].append(row["calidad"])
+            registro["_tiempo"].append(row["tiempo"])
+
+    salida = []
+    for registro in acumulado.values():
+        registro["calidad_media"] = _avg(registro.pop("_calidad"))
+        registro["tiempo_medio"] = _avg(registro.pop("_tiempo"))
+        salida.append(registro)
+    return sorted(salida, key=lambda item: item["total"], reverse=True)
 
 
 def calendar(year: int, month: Optional[int] = None,

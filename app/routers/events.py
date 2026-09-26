@@ -11,7 +11,7 @@ from app import crud
 from app.routers.common import Filters
 from app.schemas import EventCreate, EventPage, EventRange, EventUpdate
 from app.schemas import Options, RangeResult
-from app.schemas import MOTIVACIONES, PRETEXTOS_SUGERIDOS, TIPOS
+from app.schemas import MOTIVACIONES, PRETEXTOS_SUGERIDOS, TAGS_SUGERIDOS, TIPOS
 
 router = APIRouter(prefix="/api", tags=["registros"])
 
@@ -75,9 +75,17 @@ async def delete_event(event_id: int) -> Response:
 def get_options() -> Any:
     usados = crud.distinct_pretextos()
     pretextos = sorted({*PRETEXTOS_SUGERIDOS, *usados}, key=str.casefold)
+
+    # Primero las etiquetas ya usadas, por frecuencia, y detrás el resto de
+    # sugerencias: lo que más se repite queda a mano.
+    en_uso = crud.distinct_tags()
+    vistas = {etiqueta.casefold() for etiqueta in en_uso}
+    tags = en_uso + [t for t in TAGS_SUGERIDOS if t.casefold() not in vistas]
+
     return {
         "tipos": list(TIPOS),
         "motivaciones": list(MOTIVACIONES),
         "pretextos": pretextos,
+        "tags": tags,
         "years": crud.distinct_years(),
     }

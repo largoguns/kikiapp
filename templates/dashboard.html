@@ -37,7 +37,7 @@
 
   <!-- ══ Fila de filtros: una sola, encima de todo lo que filtra ═══════════ -->
   <section class="card mb-5" aria-label="Filtros">
-    <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-7">
+    <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-8">
       <div>
         <label class="label" for="f-year">Año</label>
         <select id="f-year" class="field" x-model="filtros.year" @change="recargar()">
@@ -80,6 +80,15 @@
           <option value="">Cualquiera</option>
           <template x-for="nivel in [1,2,3,4]" :key="nivel">
             <option :value="nivel" x-text="nivel"></option>
+          </template>
+        </select>
+      </div>
+      <div>
+        <label class="label" for="f-tag">Etiqueta</label>
+        <select id="f-tag" class="field" x-model="filtros.tag" @change="recargar()">
+          <option value="">Todas</option>
+          <template x-for="item in opciones.tags" :key="item">
+            <option :value="item" x-text="item"></option>
           </template>
         </select>
       </div>
@@ -360,7 +369,9 @@
           <tr>
             <template x-for="columna in columnasTabla" :key="columna.campo">
               <th>
-                <button class="flex items-center gap-1 hover:text-ink"
+                <button class="flex items-center gap-1"
+                        :class="columna.ordenable === false ? 'cursor-default' : 'hover:text-ink'"
+                        :disabled="columna.ordenable === false"
                         @click="ordenarPor(columna.campo)">
                   <span x-text="columna.titulo"></span>
                   <span class="text-ink-3" x-show="orden.campo === columna.campo"
@@ -385,7 +396,15 @@
               <td x-text="registro.motivacion || '—'"></td>
               <td x-text="registro.tipo === 'Kiki' ? registro.calidad : '—'"></td>
               <td x-text="registro.tipo === 'Kiki' ? registro.tiempo : '—'"></td>
-              <td class="max-w-[320px] truncate" :title="registro.observaciones || ''"
+              <td class="max-w-[260px]">
+                <div class="flex flex-wrap gap-1" x-show="registro.tags && registro.tags.length">
+                  <template x-for="etiqueta in (registro.tags || [])" :key="etiqueta">
+                    <span class="tag-lectura" x-text="etiqueta"></span>
+                  </template>
+                </div>
+                <span x-show="!registro.tags || !registro.tags.length" class="text-ink-3">—</span>
+              </td>
+              <td class="max-w-[260px] truncate" :title="registro.observaciones || ''"
                   x-text="registro.observaciones || '—'"></td>
               <td class="whitespace-nowrap text-right">
                 <button class="btn btn-ghost px-2 py-1 text-xs" @click="editarRegistro(registro)">Editar</button>
@@ -394,7 +413,7 @@
             </tr>
           </template>
           <tr x-show="!registros.length && !cargando">
-            <td colspan="8" class="py-8 text-center text-ink-3">Sin registros para este filtro.</td>
+            <td colspan="9" class="py-8 text-center text-ink-3">Sin registros para este filtro.</td>
           </tr>
         </tbody>
       </table>
@@ -500,6 +519,31 @@
                 <option :value="item"></option>
               </template>
             </datalist>
+          </div>
+        </div>
+
+        <!-- Qué pasó: etiquetas. Sólo el Kiki las lleva. -->
+        <div x-show="modal.form.tipo === 'Kiki'">
+          <div class="flex items-baseline justify-between">
+            <span class="label">Qué pasó</span>
+            <span class="mb-1.5 text-xs text-ink-3"
+                  x-show="modal.form.tags.length"
+                  x-text="modal.form.tags.length === 1
+                      ? '1 seleccionada' : `${modal.form.tags.length} seleccionadas`"></span>
+          </div>
+          <div class="max-h-36 overflow-y-auto rounded-xl border border-hairline bg-surface-2/40 p-2">
+            <div class="flex flex-wrap gap-1.5">
+              <template x-for="etiqueta in opciones.tags" :key="etiqueta">
+                <button type="button" class="tag"
+                        :aria-pressed="tagActivo(etiqueta)"
+                        @click="alternarTag(etiqueta)" x-text="etiqueta"></button>
+              </template>
+            </div>
+          </div>
+          <div class="mt-2 flex gap-2">
+            <input class="field" x-model="nuevaEtiqueta" placeholder="Añadir otra…"
+                   @keydown.enter.prevent="anadirEtiqueta()">
+            <button type="button" class="btn btn-ghost" @click="anadirEtiqueta()">Añadir</button>
           </div>
         </div>
 

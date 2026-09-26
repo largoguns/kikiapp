@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, Sequence
@@ -20,6 +21,7 @@ COLUMNS = (
     "calidad",
     "tiempo",
     "observaciones",
+    "tags",
     "created_at",
     "updated_at",
 )
@@ -30,7 +32,27 @@ def _now() -> str:
 
 
 def row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
-    return {key: row[key] for key in row.keys()}
+    datos = {key: row[key] for key in row.keys()}
+    if "tags" in datos:
+        datos["tags"] = _leer_tags(datos["tags"])
+    return datos
+
+
+def _leer_tags(valor: Any) -> list[str]:
+    """La columna guarda un array JSON; una base antigua puede traer NULL."""
+    if isinstance(valor, list):
+        return valor
+    if not valor:
+        return []
+    try:
+        etiquetas = json.loads(valor)
+    except (TypeError, ValueError):
+        return []
+    return [str(item) for item in etiquetas] if isinstance(etiquetas, list) else []
+
+
+def _escribir_tags(etiquetas: Any) -> str:
+    return json.dumps(list(etiquetas or []), ensure_ascii=False)
 
 
 class EventFilters:
@@ -44,6 +66,7 @@ class EventFilters:
         tipo: Optional[Sequence[str]] = None,
         motivacion: Optional[Sequence[str]] = None,
         pretexto: Optional[Sequence[str]] = None,
+        tag: Optional[Sequence[str]] = None,
         min_calidad: Optional[int] = None,
         min_tiempo: Optional[int] = None,
         q: Optional[str] = None,
@@ -54,6 +77,7 @@ class EventFilters:
         self.tipo = list(tipo) if tipo else []
         self.motivacion = list(motivacion) if motivacion else []
         self.pretexto = list(pretexto) if pretexto else []
+        self.tag = list(tag) if tag else []
         self.min_calidad = min_calidad
         self.min_tiempo = min_tiempo
         self.q = (q or "").strip()
@@ -80,6 +104,14 @@ class EventFilters:
                 placeholders = ", ".join("?" for _ in values)
                 clauses.append(f"{column} IN ({placeholders})")
                 params.extend(values)
+        if self.tag:
+            # Basta con que el registro lleve alguna de las etiquetas pedidas.
+            placeholders = ", ".join("?" for _ in self.tag)
+            clauses.append(
+                f"EXISTS (SELECT 1 FROM json_each(events.tags) "
+                f"WHERE json_each.value IN ({placeholders}))"
+            )
+            params.extend(self.tag)
         # Las puntuaciones sólo existen en los "Kiki"; filtrar por ellas
         # no debe arrastrar los ceros forzados de "No Kiki"/"Marea".
         if self.min_calidad is not None:
@@ -137,8 +169,8 @@ def create_event(payload: EventCreate) -> dict[str, Any]:
             """
             INSERT INTO events
                 (fecha, tipo, pretexto, motivacion, calidad, tiempo, observaciones,
-                 created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 tags, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 payload.fecha.isoformat(),
@@ -148,6 +180,7 @@ def create_event(payload: EventCreate) -> dict[str, Any]:
                 payload.calidad,
                 payload.tiempo,
                 payload.observaciones,
+                _escribir_tags(payload.tags),
                 now,
                 now,
             ),
@@ -192,7 +225,7 @@ def update_event(event_id: int, payload: EventUpdate) -> Optional[dict[str, Any]
             """
             UPDATE events
                SET fecha = ?, tipo = ?, pretexto = ?, motivacion = ?, calidad = ?,
-                   tiempo = ?, observaciones = ?, updated_at = ?
+                   tiempo = ?, observaciones = ?, tags = ?, updated_at = ?
              WHERE id = ?
             """,
             (
@@ -203,6 +236,7 @@ def update_event(event_id: int, payload: EventUpdate) -> Optional[dict[str, Any]
                 payload.calidad,
                 payload.tiempo,
                 payload.observaciones,
+                _escribir_tags(payload.tags),
                 _now(),
                 event_id,
             ),
@@ -230,6 +264,17 @@ def distinct_pretextos() -> list[str]:
             "WHERE pretexto IS NOT NULL AND pretexto <> '' ORDER BY pretexto COLLATE NOCASE"
         ).fetchall()
     return [row["pretexto"] for row in rows]
+
+
+def distinct_tags() -> list[str]:
+    """Etiquetas ya usadas, de la más frecuente a la menos."""
+    with db.connect() as conn:
+        filas = conn.execute(
+            "SELECT json_each.value AS tag, COUNT(*) AS n "
+            "FROM events, json_each(events.tags) "
+            "GROUP BY tag ORDER BY n DESC, tag COLLATE NOCASE"
+        ).fetchall()
+    return [fila["tag"] for fila in filas]
 
 
 def distinct_years() -> list[int]:
@@ -266,13 +311,15 @@ def upsert_many(records: list[dict[str, Any]]) -> tuple[int, int]:
                 int(record.get("calidad") or 0),
                 int(record.get("tiempo") or 0),
                 record.get("observaciones"),
+                _escribir_tags(record.get("tags")),
             )
             if existing:
                 conn.execute(
                     """
                     UPDATE events
                        SET fecha = ?, tipo = ?, pretexto = ?, motivacion = ?,
-                           calidad = ?, tiempo = ?, observaciones = ?, updated_at = ?
+                           calidad = ?, tiempo = ?, observaciones = ?, tags = ?,
+                           updated_at = ?
                      WHERE id = ?
                     """,
                     (*values, now, event_id),
@@ -283,8 +330,8 @@ def upsert_many(records: list[dict[str, Any]]) -> tuple[int, int]:
                     """
                     INSERT INTO events
                         (id, fecha, tipo, pretexto, motivacion, calidad, tiempo,
-                         observaciones, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         observaciones, tags, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (event_id, *values, now, now),
                 )
@@ -294,8 +341,8 @@ def upsert_many(records: list[dict[str, Any]]) -> tuple[int, int]:
                     """
                     INSERT INTO events
                         (fecha, tipo, pretexto, motivacion, calidad, tiempo,
-                         observaciones, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         observaciones, tags, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (*values, now, now),
                 )

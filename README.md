@@ -172,7 +172,7 @@ docker compose exec kiki-app python tools/import_file.py /app/data/Kiki.xlsx
   están en `GET /api/stats/summary`, pero no ocupan sitio en el panel.
 - **Filtros** —año, tipo, motivación, pretexto, calidad ≥, tiempo ≥ y búsqueda
   libre— en una sola fila que afecta a todo lo que hay debajo.
-- **Seis gráficos**, cada uno con su gemela en tabla a un clic. La `Marea`
+- **Siete gráficos**, cada uno con su gemela en tabla a un clic. La `Marea`
   no se pinta en ninguno: es un bloque de siete días o más al mes, así que
   aplastaría la escala de los encuentros sin aportar nada que no cuenten ya
   el calendario y la tarjeta de ciclo.
@@ -224,7 +224,7 @@ FastAPI).
 | `GET` | `/api/events/{id}` | Devuelve un registro. |
 | `PUT` | `/api/events/{id}` | Actualiza un registro. |
 | `DELETE` | `/api/events/{id}` | Elimina un registro. |
-| `GET` | `/api/options` | Tipos, motivaciones, pretextos usados y años con datos. |
+| `GET` | `/api/options` | Tipos, motivaciones, pretextos, etiquetas y años con datos. |
 | `GET` | `/api/stats/summary` | KPIs, distribuciones, sequías y ciclo. |
 | `GET` | `/api/stats/monthly` | Serie de los doce meses de un año. |
 | `GET` | `/api/stats/yearly` | Serie histórica por año. |
@@ -235,8 +235,9 @@ FastAPI).
 | `GET` | `/api/health` | Estado del servicio (lo usa el healthcheck). |
 
 Filtros aceptados por los endpoints de listado y estadísticas: `year`,
-`desde`, `hasta`, `tipo`, `motivacion`, `pretexto`, `min_calidad`,
-`min_tiempo` y `q`. Los de lista añaden `sort`, `order`, `limit` y `offset`.
+`desde`, `hasta`, `tipo`, `motivacion`, `pretexto`, `tag`, `min_calidad`,
+`min_tiempo` y `q`. Los que admiten varios valores —`tipo`, `motivacion`,
+`pretexto`, `tag`— filtran por «alguno de». Los de lista añaden `sort`, `order`, `limit` y `offset`.
 
 ```bash
 # Los Kikis de 2026 con calidad 4, del más reciente al más antiguo
@@ -263,6 +264,7 @@ curl -X POST localhost:8080/api/events \
 | `calidad` | entero | `0`–`4` | Valoración del encuentro. |
 | `tiempo` | entero | `0`–`4` | Valoración de la duración. |
 | `observaciones` | texto | opcional | Notas libres. |
+| `tags` | lista de texto | opcional, máx. 12 | Qué pasó: prácticas y posturas. |
 
 Dos reglas se aplican en el servidor, así que valen igual desde la API que
 desde cualquiera de las dos vistas:
@@ -279,12 +281,12 @@ cada tipo adicional presente.
 
 ### Qué cuenta en cada métrica
 
-| Categoría | Calidad y tiempo | Pretexto y motivación | Días sin… | % de acierto |
-| :--- | :---: | :---: | :--- | :---: |
-| `Kiki` | sí, 0–4 | sí | resetea «días sin Kiki» | suma |
-| `No Kiki` | no | sí | — | resta |
-| `Gayola` | no | **no** | tiene su propio «días sin Gayola» | no entra |
-| `Marea` | no | no | — | no entra |
+| Categoría | Calidad y tiempo | Pretexto y motivación | Etiquetas | Días sin… | % de acierto |
+| :--- | :---: | :---: | :---: | :--- | :---: |
+| `Kiki` | sí, 0–4 | sí | sí | resetea «días sin Kiki» | suma |
+| `No Kiki` | no | sí | no | — | resta |
+| `Gayola` | no | **no** | no | tiene su propio «días sin Gayola» | no entra |
+| `Marea` | no | no | no | — | no entra |
 
 `Gayola` es una **categoría aparte**: tiene sus propios totales y su propio
 contador de días, y no toca ni el contador de días sin Kiki ni el porcentaje
@@ -296,6 +298,27 @@ dimensiones. Sí admite observaciones.
 El servidor vacía por su cuenta los campos que no corresponden al tipo, así
 que la regla vale igual llegando desde la API, desde la PWA o desde el
 importador.
+
+### Etiquetas
+
+Los `Kiki` se pueden etiquetar con lo que pasó —prácticas y posturas— en vez
+de dejarlo todo en texto libre. Las observaciones siguen ahí para lo que no
+cabe en una etiqueta.
+
+La lista **no es cerrada**: la app trae dos docenas de sugerencias, el
+desplegable pone delante las que más usas, y desde el formulario se puede
+añadir cualquier otra. Se guardan como array JSON en la propia fila, se
+normalizan al escribir —se recortan, se quitan repetidos sin distinguir
+mayúsculas— y con un tope de 12 por registro para que la tabla siga siendo
+legible.
+
+Sirven para algo más que describir: hay un filtro por etiqueta que afecta a
+todo el dashboard, y un gráfico **Por etiqueta** que dice qué se repite y con
+qué calidad media. Como un mismo Kiki suma en todas sus etiquetas, ese
+gráfico es un reparto y no una partición: los totales no cuadran con el
+número de Kikis, y es lo correcto.
+
+Sólo los `Kiki` las llevan: un `No Kiki` es justamente lo que no pasó.
 
 ### Alta por rango
 

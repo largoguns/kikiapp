@@ -167,6 +167,56 @@ def test_rango_invalido_se_rechaza(cliente):
     assert excesivo.status_code == 422
 
 
+def test_tags_solo_en_los_kiki(cliente):
+    kiki = crear(cliente, tags=["  Perrito ", "perrito", "Cunilingus", ""])
+    # Se recortan, se quitan repetidos sin distinguir mayúsculas y se ordena
+    # como se escribió.
+    assert kiki["tags"] == ["Perrito", "Cunilingus"]
+    # Las observaciones conviven con las etiquetas.
+    assert crear(cliente, fecha="2026-03-11", tags=["Anal"],
+                 observaciones="una nota")["observaciones"] == "una nota"
+
+    for tipo in ("No Kiki", "Gayola", "Marea"):
+        otro = crear(cliente, fecha="2026-03-12", tipo=tipo, tags=["Anal"])
+        assert otro["tags"] == [], tipo
+
+
+def test_tags_se_pueden_filtrar(cliente):
+    crear(cliente, fecha="2026-04-01", tags=["Perrito", "Cunilingus"])
+    crear(cliente, fecha="2026-04-02", tags=["Perrito", "Misionero"])
+    crear(cliente, fecha="2026-04-03", tags=["Ducha"])
+
+    assert cliente.get("/api/events?tag=Perrito").json()["total"] == 2
+    assert cliente.get("/api/events?tag=Ducha").json()["total"] == 1
+    # Varias etiquetas: basta con que lleve alguna.
+    assert cliente.get("/api/events?tag=Cunilingus&tag=Ducha").json()["total"] == 2
+    assert cliente.get("/api/events?tag=Inexistente").json()["total"] == 0
+
+
+def test_tags_en_opciones_y_reparto(cliente):
+    crear(cliente, fecha="2026-04-01", calidad=4, tags=["Perrito"])
+    crear(cliente, fecha="2026-04-02", calidad=2, tags=["Perrito", "Ducha"])
+
+    opciones = cliente.get("/api/options").json()
+    # Primero las usadas, por frecuencia; detrás las sugerencias.
+    assert opciones["tags"][0] == "Perrito"
+    assert "Felación" in opciones["tags"]
+
+    reparto = cliente.get("/api/stats/breakdown").json()["tags"]
+    perrito = next(item for item in reparto if item["clave"] == "Perrito")
+    assert perrito["total"] == 2
+    assert perrito["calidad_media"] == 3      # (4 + 2) / 2
+
+
+def test_al_editar_se_pueden_cambiar_los_tags(cliente):
+    creado = crear(cliente, tags=["Perrito"])
+    actualizado = cliente.put(f"/api/events/{creado['id']}", json={
+        "fecha": "2026-03-10", "tipo": "Kiki", "calidad": 3, "tiempo": 2,
+        "tags": ["Vaquera", "Juguetes"],
+    }).json()
+    assert actualizado["tags"] == ["Vaquera", "Juguetes"]
+
+
 def test_normalizacion_limpia_filas_antiguas(cliente):
     """Las reglas por tipo han cambiado: al arrancar se ponen al día."""
     from app import db
@@ -175,8 +225,9 @@ def test_normalizacion_limpia_filas_antiguas(cliente):
     with db.connect() as conexion:
         conexion.execute(
             "INSERT INTO events (fecha, tipo, pretexto, motivacion, calidad, tiempo,"
-            " created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            ("2026-02-02", "Gayola", "Calentura", "Propia", 4, 3, "x", "x"),
+            " tags, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("2026-02-02", "Gayola", "Calentura", "Propia", 4, 3,
+             '["Anal"]', "x", "x"),
         )
 
     assert db.normalizar_por_tipo() == 1
@@ -185,6 +236,7 @@ def test_normalizacion_limpia_filas_antiguas(cliente):
             "SELECT * FROM events WHERE fecha = '2026-02-02'").fetchone()
     assert fila["pretexto"] is None and fila["motivacion"] is None
     assert (fila["calidad"], fila["tiempo"]) == (0, 0)
+    assert fila["tags"] == "[]"
 
     # Idempotente: una segunda pasada ya no toca nada.
     assert db.normalizar_por_tipo() == 0

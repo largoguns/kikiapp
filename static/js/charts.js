@@ -268,6 +268,56 @@
     };
   }
 
+  /** Reparto por etiqueta. Un Kiki suma en todas las suyas, así que esto es
+      un reparto, no una partición: los totales no cuadran con el nº de Kikis. */
+  function etiquetas(items, limite) {
+    const ordenados = items.slice(0, limite || items.length);
+    return {
+      config: {
+        type: 'bar',
+        data: {
+          labels: ordenados.map((item) => item.clave),
+          datasets: [
+            Object.assign(
+              { label: 'Kikis', data: ordenados.map((item) => item.total),
+                backgroundColor: C.kiki },
+              BARRA_HORIZONTAL
+            ),
+          ],
+        },
+        options: opcionesBase({
+          indexAxis: 'y',
+          // Una sola serie: el título ya dice qué se está midiendo.
+          plugins: {
+            legend: { display: false },
+            tooltip: Object.assign(tooltip(), {
+              callbacks: {
+                label: (item) => ` ${item.formattedValue} kikis`,
+                afterLabel: (item) => {
+                  const dato = ordenados[item.dataIndex];
+                  return dato.calidad_media === null
+                    ? ''
+                    : ` calidad media ${dato.calidad_media} · tiempo ${dato.tiempo_medio}`;
+                },
+              },
+            }),
+          },
+          scales: {
+            x: ejeValor('kikis'),
+            y: Object.assign(ejeCategoria(),
+                             { ticks: { color: C.ink2, font: { size: 11 } } }),
+          },
+        }),
+      },
+      tabla: tabla(
+        ['Etiqueta', 'Kikis', 'Calidad media', 'Tiempo medio'],
+        ordenados.map((item) => [
+          item.clave, item.total, item.calidad_media ?? '—', item.tiempo_medio ?? '—',
+        ])
+      ),
+    };
+  }
+
   /** Actividad por día de la semana. */
   function semana(dias) {
     return {
@@ -298,6 +348,7 @@
     anual,
     distribucion,
     reparto,
+    etiquetas,
     semana,
   };
 })(window);

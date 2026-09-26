@@ -24,6 +24,13 @@ TIPOS_INTENTO: tuple[str, ...] = (TIPO_KIKI, TIPO_NO_KIKI)
 # motivación.
 TIPOS_CON_CONTEXTO: tuple[str, ...] = (TIPO_KIKI, TIPO_NO_KIKI)
 
+# Sólo lo que sí ocurrió se puede etiquetar con qué pasó.
+TIPOS_CON_TAGS: tuple[str, ...] = (TIPO_KIKI,)
+
+# Tope por registro, para que la lista siga siendo legible en la tabla.
+MAX_TAGS = 12
+MAX_LARGO_TAG = 40
+
 MOTIVACIONES: tuple[str, ...] = ("Propia", "Ajena", "Ambos")
 
 # Sugerencias iniciales; la API devuelve además los pretextos ya usados en la BBDD.
@@ -42,6 +49,36 @@ PRETEXTOS_SUGERIDOS: tuple[str, ...] = (
 # Tope de seguridad para el alta por rango: un ciclo largo cabe de sobra.
 MAX_DIAS_RANGO = 90
 
+# Sugerencias de partida. La lista no es cerrada: la API acepta cualquier
+# etiqueta y el desplegable ofrece además las ya usadas.
+TAGS_SUGERIDOS: tuple[str, ...] = (
+    # Oral y manual
+    "Cunilingus",
+    "Felación",
+    "69",
+    "Masturbación mutua",
+    "Anal dactilar",
+    # Penetración
+    "Anal",
+    "Misionero",
+    "Vaquera",
+    "Vaquera invertida",
+    "Perrito",
+    "Cucharita",
+    "De lado",
+    "De pie",
+    "Sentados",
+    # Contexto
+    "Preliminares largos",
+    "Juguetes",
+    "Lencería",
+    "Masaje",
+    "Ducha",
+    "Rapidito",
+    "Mañanero",
+    "Al aire libre",
+)
+
 TipoEvento = Literal["Kiki", "No Kiki", "Gayola", "Marea"]
 Motivacion = Literal["Propia", "Ajena", "Ambos"]
 
@@ -54,6 +91,28 @@ class EventBase(BaseModel):
     calidad: int = Field(default=0, ge=0, le=4)
     tiempo: int = Field(default=0, ge=0, le=4)
     observaciones: Optional[str] = None
+    tags: list[str] = Field(default_factory=list)
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def _normalizar_tags(cls, value: object) -> object:
+        """Acepta lista o texto separado por comas, y quita repetidos."""
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = value.split(",")
+        if not isinstance(value, (list, tuple)):
+            return value
+
+        limpias: list[str] = []
+        for item in value:
+            etiqueta = str(item).strip()[:MAX_LARGO_TAG]
+            # Sin distinguir mayúsculas, pero conservando cómo se escribió.
+            if etiqueta and etiqueta.casefold() not in {
+                existente.casefold() for existente in limpias
+            }:
+                limpias.append(etiqueta)
+        return limpias[:MAX_TAGS]
 
     @field_validator("pretexto", "observaciones", mode="before")
     @classmethod
@@ -84,6 +143,8 @@ class EventBase(BaseModel):
         if self.tipo not in TIPOS_CON_CONTEXTO:
             object.__setattr__(self, "pretexto", None)
             object.__setattr__(self, "motivacion", None)
+        if self.tipo not in TIPOS_CON_TAGS:
+            object.__setattr__(self, "tags", [])
         return self
 
 
@@ -136,5 +197,6 @@ class Options(BaseModel):
     tipos: list[str]
     motivaciones: list[str]
     pretextos: list[str]
+    tags: list[str]
     years: list[int]
 

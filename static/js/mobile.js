@@ -13,6 +13,7 @@ function movil() {
     calidad: 3,
     tiempo: 2,
     observaciones: '',
+    tags: [],
   });
 
   function leerCola() {
@@ -31,7 +32,12 @@ function movil() {
     Kiki: K,
     pestana: 'registrar',
     form: FORM_VACIO(),
-    opciones: { tipos: K.TIPOS, motivaciones: ['Propia', 'Ajena', 'Ambos'], pretextos: [] },
+    opciones: {
+      tipos: K.TIPOS,
+      motivaciones: ['Propia', 'Ajena', 'Ambos'],
+      pretextos: [],
+      tags: [],
+    },
 
     kpi: {},
     historial: [],
@@ -92,6 +98,20 @@ function movil() {
       }
     },
 
+    alternarTag(etiqueta) {
+      const indice = this.form.tags.findIndex(
+        (item) => item.toLowerCase() === etiqueta.toLowerCase()
+      );
+      if (indice >= 0) this.form.tags.splice(indice, 1);
+      else this.form.tags.push(etiqueta);
+    },
+
+    tagActivo(etiqueta) {
+      return this.form.tags.some(
+        (item) => item.toLowerCase() === etiqueta.toLowerCase()
+      );
+    },
+
     cuerpo() {
       const esKiki = this.form.tipo === 'Kiki';
       return {
@@ -102,6 +122,7 @@ function movil() {
         calidad: esKiki ? this.form.calidad : 0,
         tiempo: esKiki ? this.form.tiempo : 0,
         observaciones: this.form.observaciones || null,
+        tags: esKiki ? this.form.tags : [],
       };
     },
 

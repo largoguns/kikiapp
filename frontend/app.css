@@ -214,6 +214,45 @@
     color: #f09aa4;
   }
 
+  /* Etiquetas seleccionables ------------------------------------------------ */
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 999px;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid var(--color-hairline);
+    background-color: var(--color-surface-2);
+    color: var(--color-ink-3);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+  .tag:hover {
+    background-color: var(--color-surface-3);
+    color: var(--color-ink-2);
+  }
+
+  .tag[aria-pressed="true"] {
+    background-color: rgb(25 158 112 / 0.18);
+    border-color: rgb(25 158 112 / 0.55);
+    color: #7fe0bc;
+  }
+
+  /* Etiqueta sólo informativa, en la tabla de registros. */
+  .tag-lectura {
+    display: inline-flex;
+    border-radius: 999px;
+    padding: 0.0625rem 0.4375rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    background-color: rgb(25 158 112 / 0.14);
+    color: #7fe0bc;
+    white-space: nowrap;
+  }
+
   /* Tabla ------------------------------------------------------------------ */
   .data-table {
     width: 100%;

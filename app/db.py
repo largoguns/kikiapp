@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from typing import Iterator, Optional
 
 from app import config
-from app.schemas import TIPOS_CON_CONTEXTO, TIPOS_PUNTUADOS
+from app.schemas import TIPOS_CON_CONTEXTO, TIPOS_CON_TAGS, TIPOS_PUNTUADOS
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS events (
     calidad       INTEGER NOT NULL DEFAULT 0,
     tiempo        INTEGER NOT NULL DEFAULT 0,
     observaciones TEXT,
+    tags          TEXT    NOT NULL DEFAULT '[]',
     created_at    TEXT    NOT NULL,
     updated_at    TEXT    NOT NULL
 );
@@ -56,7 +57,19 @@ def connect() -> Iterator[sqlite3.Connection]:
 def init_db() -> None:
     with connect() as conn:
         conn.executescript(SCHEMA)
+    migrar_columnas()
     normalizar_por_tipo()
+
+
+def migrar_columnas() -> None:
+    """Añade las columnas que falten en bases creadas por versiones previas."""
+    nuevas = {"tags": "TEXT NOT NULL DEFAULT '[]'"}
+    with connect() as conn:
+        existentes = {fila[1] for fila in conn.execute("PRAGMA table_info(events)")}
+        for nombre, definicion in nuevas.items():
+            if nombre not in existentes:
+                conn.execute(f"ALTER TABLE events ADD COLUMN {nombre} {definicion}")
+                logger.info("Columna «%s» añadida a events", nombre)
 
 
 def normalizar_por_tipo() -> int:
@@ -70,6 +83,7 @@ def normalizar_por_tipo() -> int:
     """
     puntuados = ", ".join("?" for _ in TIPOS_PUNTUADOS)
     con_contexto = ", ".join("?" for _ in TIPOS_CON_CONTEXTO)
+    con_tags = ", ".join("?" for _ in TIPOS_CON_TAGS)
 
     # Una sola sentencia: así el recuento son filas, no correcciones sueltas.
     sql = f"""
@@ -77,14 +91,18 @@ def normalizar_por_tipo() -> int:
            SET calidad    = CASE WHEN tipo IN ({puntuados}) THEN calidad ELSE 0 END,
                tiempo     = CASE WHEN tipo IN ({puntuados}) THEN tiempo  ELSE 0 END,
                pretexto   = CASE WHEN tipo IN ({con_contexto}) THEN pretexto   ELSE NULL END,
-               motivacion = CASE WHEN tipo IN ({con_contexto}) THEN motivacion ELSE NULL END
+               motivacion = CASE WHEN tipo IN ({con_contexto}) THEN motivacion ELSE NULL END,
+               tags       = CASE WHEN tipo IN ({con_tags}) THEN tags ELSE '[]' END
          WHERE (tipo NOT IN ({puntuados}) AND (calidad <> 0 OR tiempo <> 0))
             OR (tipo NOT IN ({con_contexto})
                 AND (pretexto IS NOT NULL OR motivacion IS NOT NULL))
+            OR (tipo NOT IN ({con_tags})
+                AND tags IS NOT NULL AND tags <> '[]')
     """
     parametros = (
         *TIPOS_PUNTUADOS, *TIPOS_PUNTUADOS, *TIPOS_CON_CONTEXTO,
-        *TIPOS_CON_CONTEXTO, *TIPOS_PUNTUADOS, *TIPOS_CON_CONTEXTO,
+        *TIPOS_CON_CONTEXTO, *TIPOS_CON_TAGS,
+        *TIPOS_PUNTUADOS, *TIPOS_CON_CONTEXTO, *TIPOS_CON_TAGS,
     )
 
     with connect() as conn:
