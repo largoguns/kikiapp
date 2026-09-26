@@ -182,6 +182,22 @@ igualmente: `/?desktop=1`.
   en el dispositivo y se envía solo al recuperar la conexión.
 - Pestaña de historial con los últimos 50 registros y borrado rápido.
 
+> **La instalación y el modo offline exigen HTTPS.** Los navegadores sólo
+> consideran contexto seguro a `https://` y a `localhost`, y fuera de ahí ni
+> siquiera exponen `navigator.serviceWorker`. Entrando por
+> `http://192.168.x.x:8080` la app funciona con normalidad, pero Chrome
+> responde «esta aplicación no se puede instalar» y no hay caché offline ni
+> cola de envíos.
+>
+> Para resolverlo, pon un HTTPS con certificado válido delante del contenedor:
+> `tailscale serve`, o un proxy inverso —Caddy, Nginx Proxy Manager, Traefik—
+> con Let's Encrypt. Un certificado autofirmado no vale: Chrome tampoco
+> instala la PWA en ese caso.
+>
+> Para una prueba rápida en un solo dispositivo, Chrome permite marcar un
+> origen concreto como seguro en
+> `chrome://flags/#unsafely-treat-insecure-origin-as-secure`.
+
 ---
 
 ## API REST
