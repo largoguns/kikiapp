@@ -14,13 +14,27 @@ from typing import Any, Optional
 
 from app import config, crud
 from app.crud import EventFilters
-from app.schemas import TIPO_KIKI, TIPO_MAREA, TIPO_NO_KIKI
+from app.schemas import TIPO_GAYOLA, TIPO_KIKI, TIPO_MAREA, TIPO_NO_KIKI
+from app.schemas import TIPOS, TIPOS_INTENTO
 
 MESES = (
     "Ene", "Feb", "Mar", "Abr", "May", "Jun",
     "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
 )
 DIAS_SEMANA = ("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
+
+# Nombre de cada tipo como clave en los JSON de salida.
+CLAVE_TIPO: dict[str, str] = {
+    TIPO_KIKI: "kiki",
+    TIPO_NO_KIKI: "no_kiki",
+    TIPO_GAYOLA: "gayola",
+    TIPO_MAREA: "marea",
+}
+
+
+def _contador_vacio() -> dict[str, int]:
+    return {clave: 0 for clave in CLAVE_TIPO.values()}
+
 
 # Tolerancia (en días) para considerar que dos registros de "Marea" pertenecen
 # al mismo período aunque falte algún día por registrar.
@@ -59,19 +73,22 @@ def summary(filters: Optional[EventFilters] = None) -> dict[str, Any]:
     hoy = today()
 
     kikis = [row for row in rows if row["tipo"] == TIPO_KIKI]
-    no_kikis = [row for row in rows if row["tipo"] == TIPO_NO_KIKI]
-    mareas = [row for row in rows if row["tipo"] == TIPO_MAREA]
-
     calidades = [row["calidad"] for row in kikis]
     tiempos = [row["tiempo"] for row in kikis]
-    intentos = len(kikis) + len(no_kikis)
+
+    totales = _contador_vacio()
+    for row in rows:
+        clave = CLAVE_TIPO.get(row["tipo"])
+        if clave:
+            totales[clave] += 1
+
+    # El acierto compara sólo Kiki contra No Kiki: Gayola y Marea son
+    # categorías aparte y no entran en la cuenta.
+    intentos = sum(1 for row in rows if row["tipo"] in TIPOS_INTENTO)
 
     return {
         "global": _global_kpis(hoy),
-        "totales": {
-            "kiki": len(kikis),
-            "no_kiki": len(no_kikis),
-            "marea": len(mareas),
+        "totales": totales | {
             "total": len(rows),
             "ratio_kiki": round(len(kikis) / intentos * 100, 1) if intentos else None,
         },
@@ -95,31 +112,22 @@ def summary(filters: Optional[EventFilters] = None) -> dict[str, Any]:
 def _global_kpis(hoy: date) -> dict[str, Any]:
     """KPIs que no dependen de los filtros activos: son el estado "ahora"."""
     rows, total = crud.list_events(sort="fecha", order="asc")
-    ultimo_kiki = max(_dates_of(rows, TIPO_KIKI), default=None)
-    ultimo_no_kiki = max(_dates_of(rows, TIPO_NO_KIKI), default=None)
-    ultima_marea = max(_dates_of(rows, TIPO_MAREA), default=None)
+    mes, anio = hoy.strftime("%Y-%m"), hoy.strftime("%Y")
 
-    kikis_mes = sum(
-        1
-        for row in rows
-        if row["tipo"] == TIPO_KIKI and row["fecha"][:7] == hoy.strftime("%Y-%m")
-    )
-    kikis_anio = sum(
-        1
-        for row in rows
-        if row["tipo"] == TIPO_KIKI and row["fecha"][:4] == hoy.strftime("%Y")
-    )
+    resumen: dict[str, Any] = {"hoy": hoy.isoformat(), "total_registros": total}
+    for tipo, clave in CLAVE_TIPO.items():
+        ultima = max(_dates_of(rows, tipo), default=None)
+        del_tipo = [row for row in rows if row["tipo"] == tipo]
+        resumen[f"ultimo_{clave}"] = ultima.isoformat() if ultima else None
+        resumen[f"dias_sin_{clave}"] = (hoy - ultima).days if ultima else None
+        resumen[f"{clave}_mes_actual"] = sum(1 for r in del_tipo if r["fecha"][:7] == mes)
+        resumen[f"{clave}_anio_actual"] = sum(1 for r in del_tipo if r["fecha"][:4] == anio)
 
-    return {
-        "hoy": hoy.isoformat(),
-        "total_registros": total,
-        "dias_sin_kiki": (hoy - ultimo_kiki).days if ultimo_kiki else None,
-        "ultimo_kiki": ultimo_kiki.isoformat() if ultimo_kiki else None,
-        "ultimo_no_kiki": ultimo_no_kiki.isoformat() if ultimo_no_kiki else None,
-        "ultima_marea": ultima_marea.isoformat() if ultima_marea else None,
-        "kikis_mes_actual": kikis_mes,
-        "kikis_anio_actual": kikis_anio,
-    }
+    # Alias históricos, para no romper a quien ya consume estas claves.
+    resumen["ultima_marea"] = resumen["ultimo_marea"]
+    resumen["kikis_mes_actual"] = resumen["kiki_mes_actual"]
+    resumen["kikis_anio_actual"] = resumen["kiki_anio_actual"]
+    return resumen
 
 
 def _score_histogram(kikis: list[dict[str, Any]], campo: str) -> list[dict[str, int]]:
@@ -134,12 +142,8 @@ def _weekday_breakdown(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if fecha:
             contadores[fecha.weekday()][row["tipo"]] += 1
     return [
-        {
-            "dia": DIAS_SEMANA[indice],
-            "kiki": contadores[indice][TIPO_KIKI],
-            "no_kiki": contadores[indice][TIPO_NO_KIKI],
-            "marea": contadores[indice][TIPO_MAREA],
-        }
+        {"dia": DIAS_SEMANA[indice]}
+        | {clave: contadores[indice][tipo] for tipo, clave in CLAVE_TIPO.items()}
         for indice in range(7)
     ]
 
@@ -205,29 +209,32 @@ def cycle_stats(marea_dates: list[date], hoy: date) -> dict[str, Any]:
     }
 
 
+def _acumular(registro: dict[str, Any], row: dict[str, Any]) -> None:
+    """Suma un evento al bucket de su periodo, con sus valoraciones si las tiene."""
+    clave = CLAVE_TIPO.get(row["tipo"])
+    if not clave:
+        return
+    registro[clave] += 1
+    if row["tipo"] == TIPO_KIKI:
+        registro["_calidad"].append(row["calidad"])
+        registro["_tiempo"].append(row["tiempo"])
+
+
 def monthly(year: int, filters: Optional[EventFilters] = None) -> list[dict[str, Any]]:
     filters = filters or EventFilters()
     filters.year = year
     rows = _fetch(filters)
 
     acumulado: dict[int, dict[str, Any]] = {
-        mes: {"mes": mes, "etiqueta": MESES[mes - 1], "kiki": 0, "no_kiki": 0,
-              "marea": 0, "_calidad": [], "_tiempo": []}
+        mes: {"mes": mes, "etiqueta": MESES[mes - 1], "_calidad": [], "_tiempo": []}
+             | _contador_vacio()
         for mes in range(1, 13)
     }
     for row in rows:
         fecha = _parse(row["fecha"])
         if not fecha:
             continue
-        registro = acumulado[fecha.month]
-        if row["tipo"] == TIPO_KIKI:
-            registro["kiki"] += 1
-            registro["_calidad"].append(row["calidad"])
-            registro["_tiempo"].append(row["tiempo"])
-        elif row["tipo"] == TIPO_NO_KIKI:
-            registro["no_kiki"] += 1
-        elif row["tipo"] == TIPO_MAREA:
-            registro["marea"] += 1
+        _acumular(acumulado[fecha.month], row)
 
     resultado = []
     for mes in range(1, 13):
@@ -250,17 +257,9 @@ def yearly(filters: Optional[EventFilters] = None) -> list[dict[str, Any]]:
             continue
         registro = acumulado.setdefault(
             fecha.year,
-            {"anio": fecha.year, "kiki": 0, "no_kiki": 0, "marea": 0,
-             "_calidad": [], "_tiempo": []},
+            {"anio": fecha.year, "_calidad": [], "_tiempo": []} | _contador_vacio(),
         )
-        if row["tipo"] == TIPO_KIKI:
-            registro["kiki"] += 1
-            registro["_calidad"].append(row["calidad"])
-            registro["_tiempo"].append(row["tiempo"])
-        elif row["tipo"] == TIPO_NO_KIKI:
-            registro["no_kiki"] += 1
-        elif row["tipo"] == TIPO_MAREA:
-            registro["marea"] += 1
+        _acumular(registro, row)
 
     resultado = []
     for anio in sorted(acumulado):
@@ -272,25 +271,28 @@ def yearly(filters: Optional[EventFilters] = None) -> list[dict[str, Any]]:
 
 
 def breakdown(filters: Optional[EventFilters] = None) -> dict[str, Any]:
-    """Reparto por motivación y por pretexto (sólo sobre Kiki / No Kiki)."""
+    """Reparto por motivación y por pretexto.
+
+    La Marea queda fuera: no tiene ni motivación ni pretexto.
+    """
     rows = [row for row in _fetch(filters) if row["tipo"] != TIPO_MAREA]
+    claves = [CLAVE_TIPO[tipo] for tipo in TIPOS if tipo != TIPO_MAREA]
 
     def agrupar(campo: str) -> list[dict[str, Any]]:
         acumulado: dict[str, dict[str, Any]] = {}
         for row in rows:
             clave = row.get(campo) or "Sin especificar"
             registro = acumulado.setdefault(
-                clave, {"clave": clave, "kiki": 0, "no_kiki": 0, "_calidad": []}
+                clave,
+                {"clave": clave, "_calidad": []} | {c: 0 for c in claves},
             )
+            registro[CLAVE_TIPO[row["tipo"]]] += 1
             if row["tipo"] == TIPO_KIKI:
-                registro["kiki"] += 1
                 registro["_calidad"].append(row["calidad"])
-            else:
-                registro["no_kiki"] += 1
 
         salida = []
         for registro in acumulado.values():
-            registro["total"] = registro["kiki"] + registro["no_kiki"]
+            registro["total"] = sum(registro[c] for c in claves)
             registro["calidad_media"] = _avg(registro.pop("_calidad"))
             salida.append(registro)
         return sorted(salida, key=lambda item: item["total"], reverse=True)

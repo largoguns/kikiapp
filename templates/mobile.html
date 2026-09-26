@@ -57,7 +57,15 @@
 
     <!-- Fecha -->
     <section>
-      <span class="label">Fecha</span>
+      <div class="flex items-baseline justify-between">
+        <span class="label" x-text="usaRango ? 'Desde' : 'Fecha'"></span>
+        <!-- La Marea dura varios días: se meten todos de una vez. -->
+        <label class="mb-1.5 flex items-center gap-1.5 text-xs text-ink-3"
+               x-show="form.tipo === 'Marea'">
+          <input type="checkbox" class="h-4 w-4 accent-marea" x-model="form.rango">
+          Varios días
+        </label>
+      </div>
       <div class="flex gap-2">
         <button type="button" class="btn flex-1 py-3"
                 :class="form.fecha === Kiki.hoyISO() ? 'bg-surface-3 text-ink' : 'btn-ghost'"
@@ -67,12 +75,20 @@
                 @click="form.fecha = ayer">Ayer</button>
         <input type="date" class="field flex-1 text-center" x-model="form.fecha" aria-label="Otra fecha">
       </div>
+      <div x-show="form.rango && form.tipo === 'Marea'" class="mt-2">
+        <span class="label">Hasta</span>
+        <input type="date" class="field py-3 text-center" x-model="form.hasta"
+               :min="form.fecha" aria-label="Fecha final">
+        <p class="card-hint mt-1.5" x-show="usaRango">
+          Un registro por día. Los que ya tengan Marea se omiten.
+        </p>
+      </div>
     </section>
 
     <!-- Tipo: el control principal, a un toque -->
     <section>
       <span class="label">Tipo</span>
-      <div class="grid grid-cols-3 gap-2">
+      <div class="grid grid-cols-2 gap-2">
         <template x-for="tipo in Kiki.TIPOS" :key="tipo">
           <button type="button"
                   class="btn flex-col gap-1 rounded-2xl py-5 text-sm"

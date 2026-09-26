@@ -9,7 +9,8 @@ from fastapi.concurrency import run_in_threadpool
 
 from app import crud
 from app.routers.common import Filters
-from app.schemas import EventCreate, EventPage, EventUpdate, Options
+from app.schemas import EventCreate, EventPage, EventRange, EventUpdate
+from app.schemas import Options, RangeResult
 from app.schemas import MOTIVACIONES, PRETEXTOS_SUGERIDOS, TIPOS
 
 router = APIRouter(prefix="/api", tags=["registros"])
@@ -39,6 +40,19 @@ def get_event(event_id: int) -> Any:
 async def create_event(payload: EventCreate) -> Any:
     evento = await run_in_threadpool(crud.create_event, payload)
     return evento
+
+
+@router.post("/events/rango", response_model=RangeResult,
+             status_code=status.HTTP_201_CREATED,
+             summary="Crear un registro por cada día de un rango")
+async def create_range(payload: EventRange) -> Any:
+    """Alta en bloque, pensada para meter un ciclo menstrual de una tirada."""
+    creados, omitidos = await run_in_threadpool(crud.create_range, payload)
+    return {
+        "creados": len(creados),
+        "omitidos": omitidos,
+        "fechas": [evento["fecha"] for evento in creados],
+    }
 
 
 @router.put("/events/{event_id}", summary="Actualizar registro")

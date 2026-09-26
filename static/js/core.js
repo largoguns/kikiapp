@@ -3,11 +3,12 @@
 (function (global) {
   'use strict';
 
-  const TIPOS = ['Kiki', 'No Kiki', 'Marea'];
+  const TIPOS = ['Kiki', 'No Kiki', 'Gayola', 'Marea'];
 
   const COLOR = {
     kiki: '#199e70',
     nokiki: '#d95926',
+    gayola: '#256bb1',
     marea: '#9085e9',
     surface: '#14141a',
     surface2: '#1c1c24',
@@ -21,12 +22,14 @@
   const COLOR_POR_TIPO = {
     'Kiki': COLOR.kiki,
     'No Kiki': COLOR.nokiki,
+    'Gayola': COLOR.gayola,
     'Marea': COLOR.marea,
   };
 
   const CLASE_POR_TIPO = {
     'Kiki': 'chip-kiki',
     'No Kiki': 'chip-nokiki',
+    'Gayola': 'chip-gayola',
     'Marea': 'chip-marea',
   };
 

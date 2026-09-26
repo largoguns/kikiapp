@@ -5,6 +5,8 @@ function movil() {
 
   const FORM_VACIO = () => ({
     fecha: K.hoyISO(),
+    hasta: '',
+    rango: false,
     tipo: 'Kiki',
     pretexto: '',
     motivacion: '',
@@ -30,6 +32,7 @@ function movil() {
     pestana: 'registrar',
     form: FORM_VACIO(),
     opciones: { tipos: K.TIPOS, motivaciones: ['Propia', 'Ajena', 'Ambos'], pretextos: [] },
+
     kpi: {},
     historial: [],
     pendientes: [],
@@ -37,6 +40,11 @@ function movil() {
     guardando: false,
     error: '',
     aviso: '',
+
+    get usaRango() {
+      return this.form.rango && this.form.tipo === 'Marea'
+        && !!this.form.hasta && this.form.hasta > this.form.fecha;
+    },
 
     get ayer() {
       const fecha = new Date();
@@ -100,17 +108,21 @@ function movil() {
     async guardar() {
       this.guardando = true;
       this.error = '';
-      const cuerpo = this.cuerpo();
+      const rango = this.usaRango;
+      const ruta = rango ? '/api/events/rango' : '/api/events';
+      const cuerpo = rango
+        ? Object.assign(this.cuerpo(), { hasta: this.form.hasta })
+        : this.cuerpo();
       try {
-        await K.api.post('/api/events', cuerpo);
-        this.notificar('Guardado ✓');
+        const respuesta = await K.api.post(ruta, cuerpo);
+        this.notificar(rango ? `${respuesta.creados} días añadidos ✓` : 'Guardado ✓');
         this.reiniciar();
         await this.cargarKpi();
         if (this.pestana === 'historial') await this.cargarHistorial();
       } catch (error) {
         if (error instanceof TypeError) {
           // Fallo de red: se encola y se reintenta al volver la conexión.
-          this.pendientes = [...this.pendientes, cuerpo];
+          this.pendientes = [...this.pendientes, { ruta, cuerpo }];
           escribirCola(this.pendientes);
           this.notificar('Sin conexión: guardado para enviar luego');
           this.reiniciar();
@@ -126,11 +138,13 @@ function movil() {
       const cola = leerCola();
       if (!cola.length) return;
       const fallidos = [];
-      for (const cuerpo of cola) {
+      for (const pendiente of cola) {
+        // Los encolados antes de admitir rangos sólo guardaban el cuerpo.
+        const { ruta = '/api/events', cuerpo = pendiente } = pendiente;
         try {
-          await K.api.post('/api/events', cuerpo);
+          await K.api.post(ruta, cuerpo);
         } catch (error) {
-          if (error instanceof TypeError) fallidos.push(cuerpo);
+          if (error instanceof TypeError) fallidos.push({ ruta, cuerpo });
           // Un rechazo de validación se descarta: reintentarlo fallaría igual.
         }
       }

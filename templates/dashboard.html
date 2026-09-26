@@ -132,6 +132,17 @@
     </div>
 
     <div class="card">
+      <p class="card-title">Gayolas</p>
+      <p class="mt-1 text-3xl font-semibold text-gayola" x-text="resumen.totales.gayola"></p>
+      <p class="card-hint">
+        <span x-show="resumen.global.dias_sin_gayola !== null">
+          Hace <span class="text-ink-2" x-text="resumen.global.dias_sin_gayola"></span> días
+        </span>
+        <span x-show="resumen.global.dias_sin_gayola === null">Ninguna registrada</span>
+      </p>
+    </div>
+
+    <div class="card">
       <p class="card-title">Calidad media</p>
       <p class="mt-1 text-3xl font-semibold" x-text="Kiki.numero(resumen.promedios.calidad)"></p>
       <!-- Medidor: relleno y pista son dos pasos del mismo tono -->
@@ -173,7 +184,7 @@
       </p>
     </div>
 
-    <div class="card col-span-2">
+    <div class="card">
       <p class="card-title">Registros</p>
       <p class="mt-1 text-3xl font-semibold" x-text="resumen.totales.total"></p>
       <p class="card-hint">
@@ -215,6 +226,9 @@
       </span>
       <span class="flex items-center gap-2">
         <span class="h-3 w-4 rounded" style="background:#d95926"></span> No Kiki
+      </span>
+      <span class="flex items-center gap-2">
+        <span class="h-3 w-4 rounded" style="background:#256bb1"></span> Gayola
       </span>
       <span class="flex items-center gap-2">
         <span class="h-3 w-4 rounded" style="background:#9085e9"></span> Marea
@@ -388,13 +402,33 @@
 
       <form @submit.prevent="guardarRegistro()" class="space-y-4">
         <div>
-          <label class="label" for="m-fecha">Fecha</label>
-          <input id="m-fecha" type="date" class="field" x-model="modal.form.fecha" required>
+          <div class="flex items-baseline justify-between">
+            <label class="label" for="m-fecha"
+                   x-text="usaRango ? 'Desde' : 'Fecha'"></label>
+            <!-- La Marea dura varios días: se pueden meter todos de una vez. -->
+            <label class="mb-1.5 flex cursor-pointer items-center gap-1.5 text-xs text-ink-3"
+                   x-show="modal.form.tipo === 'Marea' && !modal.id">
+              <input type="checkbox" class="accent-marea" x-model="modal.form.rango">
+              Varios días
+            </label>
+          </div>
+          <div class="grid gap-2" :class="usaRango || modal.form.rango ? 'grid-cols-2' : 'grid-cols-1'">
+            <input id="m-fecha" type="date" class="field" x-model="modal.form.fecha" required>
+            <input id="m-hasta" type="date" class="field" x-model="modal.form.hasta"
+                   :min="modal.form.fecha" placeholder="hasta"
+                   x-show="modal.form.rango && modal.form.tipo === 'Marea' && !modal.id">
+          </div>
+          <p class="card-hint mt-1.5" x-show="usaRango">
+            Se creará un registro por día, del
+            <span class="text-ink-2" x-text="Kiki.fechaCorta(modal.form.fecha)"></span> al
+            <span class="text-ink-2" x-text="Kiki.fechaCorta(modal.form.hasta)"></span>.
+            Los días que ya tengan Marea se omiten.
+          </p>
         </div>
 
         <div>
           <span class="label">Tipo</span>
-          <div class="grid grid-cols-3 gap-2">
+          <div class="grid grid-cols-2 gap-2">
             <template x-for="tipo in Kiki.TIPOS" :key="tipo">
               <button type="button" class="btn border-hairline"
                       :style="modal.form.tipo === tipo

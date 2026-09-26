@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, Sequence
 
 from app import db
-from app.schemas import EventCreate, EventUpdate
+from app.schemas import EventCreate, EventRange, EventUpdate
 
 SORTABLE = {"id", "fecha", "tipo", "pretexto", "motivacion", "calidad", "tiempo"}
 
@@ -156,6 +156,34 @@ def create_event(payload: EventCreate) -> dict[str, Any]:
     created = get_event(event_id)
     assert created is not None
     return created
+
+
+def create_range(payload: EventRange) -> tuple[list[dict[str, Any]], int]:
+    """Crea un registro por cada día del rango, ambos extremos incluidos.
+
+    Los días que ya tienen un evento de ese mismo tipo se omiten, para que
+    ampliar un período registrado a medias no duplique los días previos.
+    Devuelve (creados, omitidos).
+    """
+    creados: list[dict[str, Any]] = []
+    omitidos = 0
+    dia = payload.fecha
+    while dia <= payload.hasta:
+        if _existe_ese_dia(dia.isoformat(), payload.tipo):
+            omitidos += 1
+        else:
+            creados.append(create_event(EventCreate(**{**payload.model_dump(
+                exclude={"hasta"}), "fecha": dia})))
+        dia += timedelta(days=1)
+    return creados, omitidos
+
+
+def _existe_ese_dia(fecha: str, tipo: str) -> bool:
+    with db.connect() as conn:
+        fila = conn.execute(
+            "SELECT 1 FROM events WHERE fecha = ? AND tipo = ? LIMIT 1", (fecha, tipo)
+        ).fetchone()
+    return fila is not None
 
 
 def update_event(event_id: int, payload: EventUpdate) -> Optional[dict[str, Any]]:

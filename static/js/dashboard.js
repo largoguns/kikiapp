@@ -4,7 +4,7 @@ function dashboard() {
 
   const RESUMEN_VACIO = {
     global: {},
-    totales: { kiki: 0, no_kiki: 0, marea: 0, total: 0, ratio_kiki: null },
+    totales: { kiki: 0, no_kiki: 0, gayola: 0, marea: 0, total: 0, ratio_kiki: null },
     promedios: { calidad: null, tiempo: null },
     periodo: { desde: null, hasta: null },
     distribucion_calidad: [],
@@ -20,6 +20,8 @@ function dashboard() {
 
   const FORM_VACIO = () => ({
     fecha: K.hoyISO(),
+    hasta: '',
+    rango: false,
     tipo: 'Kiki',
     pretexto: '',
     motivacion: '',
@@ -295,19 +297,14 @@ function dashboard() {
       };
       if (!dia) return vacio;
 
+      // Si el día tiene varios tipos, manda el primero de este orden.
       const tipos = dia.tipos;
-      let fondo;
-      let dominante;
-      if (tipos.includes('Kiki')) {
-        dominante = 'Kiki';
-        fondo = K.intensidadKiki(Math.max(dia.calidad_max, dia.tiempo_max));
-      } else if (tipos.includes('No Kiki')) {
-        dominante = 'No Kiki';
-        fondo = K.COLOR.nokiki;
-      } else {
-        dominante = 'Marea';
-        fondo = K.COLOR.marea;
-      }
+      const dominante = ['Kiki', 'Gayola', 'No Kiki', 'Marea']
+        .find((tipo) => tipos.includes(tipo));
+      // Sólo el Kiki se valora, así que sólo él lleva rampa de intensidad.
+      const fondo = dominante === 'Kiki'
+        ? K.intensidadKiki(Math.max(dia.calidad_max, dia.tiempo_max))
+        : K.COLOR_POR_TIPO[dominante];
 
       const detalle = dia.eventos
         .map((evento) =>
@@ -402,6 +399,8 @@ function dashboard() {
         id: registro.id,
         form: {
           fecha: registro.fecha,
+          hasta: '',
+          rango: false,
           tipo: registro.tipo,
           pretexto: registro.pretexto || '',
           motivacion: registro.motivacion || '',
@@ -416,6 +415,12 @@ function dashboard() {
       };
     },
 
+    get usaRango() {
+      const form = this.modal.form;
+      return !this.modal.id && form.rango && form.tipo === 'Marea'
+        && !!form.hasta && form.hasta > form.fecha;
+    },
+
     cerrarModal() {
       this.modal.abierto = false;
     },
@@ -423,19 +428,31 @@ function dashboard() {
     async guardarRegistro() {
       this.modal.guardando = true;
       this.modal.error = '';
-      const cuerpo = Object.assign({}, this.modal.form, {
-        pretexto: this.modal.form.pretexto || null,
-        motivacion: this.modal.form.motivacion || null,
-        observaciones: this.modal.form.observaciones || null,
-      });
+      const form = this.modal.form;
+      const cuerpo = {
+        fecha: form.fecha,
+        tipo: form.tipo,
+        calidad: form.calidad,
+        tiempo: form.tiempo,
+        pretexto: form.pretexto || null,
+        motivacion: form.motivacion || null,
+        observaciones: form.observaciones || null,
+      };
       try {
         if (this.modal.id) {
           await K.api.put(`/api/events/${this.modal.id}`, cuerpo);
+          this.notificar('Registro guardado');
+        } else if (this.usaRango) {
+          const r = await K.api.post('/api/events/rango',
+            Object.assign({}, cuerpo, { hasta: form.hasta }));
+          this.notificar(r.omitidos
+            ? `${r.creados} días añadidos, ${r.omitidos} ya estaban`
+            : `${r.creados} días añadidos`);
         } else {
           await K.api.post('/api/events', cuerpo);
+          this.notificar('Registro guardado');
         }
         this.modal.abierto = false;
-        this.notificar('Registro guardado');
         await this.cargarOpciones();
         await this.recargar();
       } catch (error) {

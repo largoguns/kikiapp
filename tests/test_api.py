@@ -88,7 +88,8 @@ def test_resumen_y_series(cliente):
 
     resumen = cliente.get("/api/stats/summary?year=2026").json()
     assert resumen["totales"] == {
-        "kiki": 1, "no_kiki": 1, "marea": 0, "total": 2, "ratio_kiki": 50.0
+        "kiki": 1, "no_kiki": 1, "gayola": 0, "marea": 0,
+        "total": 2, "ratio_kiki": 50.0,
     }
     assert resumen["promedios"]["calidad"] == 4
     assert resumen["global"]["ultimo_kiki"] == "2026-03-01"
@@ -100,6 +101,58 @@ def test_resumen_y_series(cliente):
     calendario = cliente.get("/api/stats/calendar?year=2026&month=3").json()
     assert set(calendario["dias"]) == {"2026-03-01", "2026-03-02"}
     assert calendario["dias"]["2026-03-01"]["calidad_max"] == 4
+
+
+def test_gayola_es_categoria_aparte_sin_puntuacion(cliente):
+    gayola = crear(cliente, tipo="Gayola", calidad=4, tiempo=4, motivacion="Ambos")
+    assert (gayola["calidad"], gayola["tiempo"]) == (0, 0)
+
+    crear(cliente, fecha="2026-03-01", calidad=2, tiempo=2)      # Kiki
+    crear(cliente, fecha="2026-03-02", tipo="No Kiki")
+
+    resumen = cliente.get("/api/stats/summary").json()
+    assert resumen["totales"]["gayola"] == 1
+    # Ni entra en el acierto (1 de 2 intentos) ni toca las medias de calidad.
+    assert resumen["totales"]["ratio_kiki"] == 50.0
+    assert resumen["promedios"]["calidad"] == 2
+
+    # Tiene su propia métrica, independiente de la del Kiki.
+    assert resumen["global"]["ultimo_gayola"] == "2026-03-10"
+    assert resumen["global"]["dias_sin_gayola"] is not None
+    assert resumen["global"]["dias_sin_kiki"] != resumen["global"]["dias_sin_gayola"]
+
+    # Y aparece como serie propia en el reparto por motivación.
+    motivacion = cliente.get("/api/stats/breakdown").json()["motivacion"]
+    assert any(item["clave"] == "Ambos" and item["gayola"] == 1 for item in motivacion)
+
+
+def test_alta_por_rango_de_fechas(cliente):
+    respuesta = cliente.post("/api/events/rango", json={
+        "fecha": "2026-04-10", "hasta": "2026-04-15", "tipo": "Marea",
+    })
+    assert respuesta.status_code == 201
+    assert respuesta.json()["creados"] == 6
+    assert cliente.get("/api/events?tipo=Marea").json()["total"] == 6
+
+
+def test_rango_solapado_no_duplica_dias(cliente):
+    cliente.post("/api/events/rango", json={
+        "fecha": "2026-04-10", "hasta": "2026-04-15", "tipo": "Marea"})
+    # Ampliar un período ya registrado a medias sólo añade lo que falta.
+    segundo = cliente.post("/api/events/rango", json={
+        "fecha": "2026-04-13", "hasta": "2026-04-18", "tipo": "Marea"}).json()
+    assert (segundo["creados"], segundo["omitidos"]) == (3, 3)
+    assert cliente.get("/api/events?tipo=Marea").json()["total"] == 9
+
+
+def test_rango_invalido_se_rechaza(cliente):
+    invertido = cliente.post("/api/events/rango", json={
+        "fecha": "2026-04-15", "hasta": "2026-04-10", "tipo": "Marea"})
+    assert invertido.status_code == 422
+
+    excesivo = cliente.post("/api/events/rango", json={
+        "fecha": "2026-01-01", "hasta": "2026-12-31", "tipo": "Marea"})
+    assert excesivo.status_code == 422
 
 
 def test_sin_importaciones_previas(cliente):

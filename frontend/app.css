@@ -7,9 +7,10 @@
    Tokens de Kiki App.
 
    Paleta de series validada con el validador de dataviz sobre la superficie
-   oscura #14141a (all-pairs): verde #199e70 (Kiki), naranja #d95926 (No Kiki),
-   violeta #9085e9 (Marea). Peor par CVD ΔE 9.4, peor par visión normal ΔE 20.9,
-   los tres por encima de 3:1 de contraste.
+   oscura #14141a, comparando TODOS los pares: verde #199e70 (Kiki), naranja
+   #d95926 (No Kiki), azul #256bb1 (Gayola) y violeta #9085e9 (Marea). Peor
+   par con deuteranopía ΔE 9.4, peor par con visión normal ΔE 17.1, y las
+   cuatro por encima de 3:1 de contraste contra el fondo.
 --------------------------------------------------------------------------- */
 @theme {
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -28,6 +29,7 @@
 
   --color-kiki: #199e70;
   --color-nokiki: #d95926;
+  --color-gayola: #256bb1;
   --color-marea: #9085e9;
 
   --color-good: #0ca30c;
@@ -191,6 +193,11 @@
     background-color: rgb(217 89 38 / 0.15);
     border-color: rgb(217 89 38 / 0.4);
     color: #f5a684;
+  }
+  .chip-gayola {
+    background-color: rgb(37 107 177 / 0.15);
+    border-color: rgb(37 107 177 / 0.4);
+    color: #9dc2ea;
   }
   .chip-marea {
     background-color: rgb(144 133 233 / 0.15);

@@ -22,11 +22,12 @@ import csv
 import io
 import re
 import unicodedata
+from collections import Counter
 from datetime import date, datetime, timedelta
 from typing import Any, Iterable, Optional
 
 from app import crud, db
-from app.schemas import MOTIVACIONES, TIPO_KIKI, TIPO_MAREA, TIPO_NO_KIKI
+from app.schemas import MOTIVACIONES, TIPO_GAYOLA, TIPO_KIKI, TIPO_MAREA, TIPO_NO_KIKI
 
 MAX_BYTES = 10 * 1024 * 1024
 META_ULTIMA_IMPORTACION = "import.ultima"
@@ -46,6 +47,7 @@ ALIAS_COLUMNA: dict[str, str] = {
 ALIAS_TIPO: dict[str, str] = {
     "kiki": TIPO_KIKI, "si": TIPO_KIKI, "encuentro": TIPO_KIKI,
     "nokiki": TIPO_NO_KIKI, "no": TIPO_NO_KIKI, "desencuentro": TIPO_NO_KIKI,
+    "gayola": TIPO_GAYOLA,
     "marea": TIPO_MAREA, "regla": TIPO_MAREA, "periodo": TIPO_MAREA,
     "menstruacion": TIPO_MAREA,
 }
@@ -436,26 +438,44 @@ def leer_mareas(libro: Any) -> tuple[list[dict[str, Any]], dict[str, int]]:
 
 # --- Escritura -------------------------------------------------------------
 
+# Campos que identifican un registro. No incluye el id: sirve para emparejar
+# lo que llega del fichero con lo que ya está guardado.
+CAMPOS_IDENTIDAD = (
+    "fecha", "tipo", "pretexto", "motivacion", "calidad", "tiempo", "observaciones",
+)
+
+
+def _huella(registro: dict[str, Any]) -> tuple[Any, ...]:
+    return tuple(registro.get(campo) for campo in CAMPOS_IDENTIDAD)
+
+
 def importar(contenido: bytes, nombre: str, modo: str = "combinar",
              simular: bool = False, hoja: Optional[str] = None) -> dict[str, Any]:
     """Analiza el fichero y, si no es simulacro, vuelca los registros.
 
-    - `combinar`: inserta lo que falta y deja intacto lo que ya existe,
-      emparejando por (fecha, tipo). Repetirlo no duplica nada.
+    - `combinar`: inserta lo que falta y deja intacto lo que ya existe.
+      Repetirlo no duplica nada.
     - `reemplazar`: vacía la tabla antes de insertar.
     """
     analisis = analizar(contenido, nombre, hoja)
     registros = analisis.pop("registros")
 
-    existentes: set[tuple[str, str]] = set()
+    # Un día admite varios eventos, incluso del mismo tipo (dos Kikis en la
+    # misma fecha). Por eso el emparejamiento es por registro completo y
+    # cuenta repeticiones: si la BBDD tiene uno y el fichero trae dos, entra
+    # el que falta en lugar de descartarse ambos.
+    disponibles: Counter[tuple[Any, ...]] = Counter()
     if modo == "combinar":
         actuales, _ = crud.list_events()
-        existentes = {(evento["fecha"], evento["tipo"]) for evento in actuales}
+        disponibles = Counter(_huella(evento) for evento in actuales)
 
-    nuevos = [
-        registro for registro in registros
-        if (registro["fecha"], registro["tipo"]) not in existentes
-    ]
+    nuevos = []
+    for registro in registros:
+        huella = _huella(registro)
+        if disponibles[huella]:
+            disponibles[huella] -= 1
+        else:
+            nuevos.append(registro)
 
     informe = analisis | {
         "modo": modo,

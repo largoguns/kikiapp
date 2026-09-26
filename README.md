@@ -1,9 +1,9 @@
 # Kiki App
 
 Aplicación web ligera para registrar y analizar **encuentros (Kiki)**,
-**desencuentros (No Kiki)** y el **período menstrual (Marea)**, con un
-dashboard completo de escritorio y una PWA móvil pensada para apuntar un
-registro en tres toques.
+**desencuentros (No Kiki)**, **Gayolas** y el **período menstrual (Marea)**,
+con un dashboard completo de escritorio y una PWA móvil pensada para apuntar
+un registro en tres toques.
 
 Todo vive en un único contenedor: FastAPI sirve la API y las dos vistas, y
 los datos se guardan en SQLite dentro de un volumen. **La app es la fuente de
@@ -209,6 +209,7 @@ FastAPI).
 | :--- | :--- | :--- |
 | `GET` | `/api/events` | Lista con filtros, orden y paginación. |
 | `POST` | `/api/events` | Crea un registro. |
+| `POST` | `/api/events/rango` | Crea un registro por cada día entre `fecha` y `hasta`. |
 | `GET` | `/api/events/{id}` | Devuelve un registro. |
 | `PUT` | `/api/events/{id}` | Actualiza un registro. |
 | `DELETE` | `/api/events/{id}` | Elimina un registro. |
@@ -245,7 +246,7 @@ curl -X POST localhost:8080/api/events \
 | :--- | :--- | :--- | :--- |
 | `id` | entero | autoincremental | Identificador único. |
 | `fecha` | texto | `YYYY-MM-DD` | Día del registro. |
-| `tipo` | texto | `Kiki`, `No Kiki`, `Marea` | Categoría principal. |
+| `tipo` | texto | `Kiki`, `No Kiki`, `Gayola`, `Marea` | Categoría principal. |
 | `pretexto` | texto | opcional | Motivo o detonante. |
 | `motivacion` | texto | `Propia`, `Ajena`, `Ambos` | De quién surgió la iniciativa. |
 | `calidad` | entero | `0`–`4` | Valoración del encuentro. |
@@ -255,12 +256,35 @@ curl -X POST localhost:8080/api/events \
 Dos reglas se aplican en el servidor, así que valen igual desde la API que
 desde cualquiera de las dos vistas:
 
-- `calidad` y `tiempo` **se fuerzan a 0** en los registros que no son `Kiki`.
+- `calidad` y `tiempo` **se fuerzan a 0** en los registros que no son `Kiki`:
+  sólo el encuentro se valora.
 - Los textos se recortan, los vacíos pasan a nulos y `motivacion` se normaliza
   (`ambos` → `Ambos`).
 
-Un mismo día admite varios registros: un `Kiki` y una `Marea` conviven sin
-problema, y el calendario lo refleja con un punto indicador.
+**Un mismo día admite varios registros**, incluso del mismo tipo: dos Kikis el
+mismo día cuentan como dos. El calendario pinta el día con el color del tipo
+dominante —Kiki, Gayola, No Kiki, Marea, en ese orden— y añade un punto por
+cada tipo adicional presente.
+
+### Qué cuenta en cada métrica
+
+| Categoría | Se valora | Días sin… | % de acierto |
+| :--- | :---: | :--- | :---: |
+| `Kiki` | sí, calidad y tiempo 0–4 | resetea «días sin Kiki» | suma |
+| `No Kiki` | no | — | resta |
+| `Gayola` | no | tiene su propio «días sin Gayola» | no entra |
+| `Marea` | no | — | no entra |
+
+`Gayola` es una **categoría aparte**: tiene sus propios totales y su propio
+contador de días, y no toca ni el contador de días sin Kiki ni el porcentaje
+de acierto, que siguen comparando sólo `Kiki` contra `No Kiki`.
+
+### Alta por rango
+
+La `Marea` dura varios días, así que el formulario permite marcar **Varios
+días** e introducir un rango de fechas de una tirada. Se crea un registro por
+día, y los días que ya tuvieran ese mismo tipo se omiten, de modo que ampliar
+un período registrado a medias no duplica nada. El tope es de 90 días.
 
 ---
 
@@ -322,11 +346,14 @@ tests/                   Suite de pytest
 
 **Los colores no son decorativos.** La paleta de series está validada para
 daltonismo y contraste sobre el fondo oscuro de la app: verde `#199e70` para
-Kiki, naranja `#d95926` para No Kiki y violeta `#9085e9` para Marea. Comparando
-todos los pares, el peor caso simulando deuteranopía es ΔE 9.4 y el peor caso
-con visión normal es ΔE 20.9; los tres superan 3:1 de contraste. En el
+Kiki, naranja `#d95926` para No Kiki, azul `#256bb1` para Gayola y violeta
+`#9085e9` para Marea. Comparando todos los pares, el peor caso simulando
+deuteranopía es ΔE 9.4 y el peor con visión normal es ΔE 17.1; las cuatro
+superan 3:1 de contraste. El cuarto color no se eligió a ojo: se barrió el
+espacio OKLCH y se validaron los candidatos, porque sobre fondo oscuro la
+mayoría de combinaciones de cuatro series no superan la prueba. En el
 calendario, la intensidad del verde es una rampa de un solo tono (0→4), nunca
-un arcoíris.
+un arcoíris; las categorías sin valoración van en color plano.
 
 **El color nunca es el único canal.** Cada gráfico tiene leyenda y una gemela
 en tabla a un clic, los tipos llevan etiqueta de texto junto al punto de

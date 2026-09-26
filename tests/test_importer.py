@@ -130,6 +130,52 @@ def test_importar_es_idempotente(cliente):
     assert segundo["ya_existentes"] == 5
 
 
+def test_varios_eventos_el_mismo_dia_y_del_mismo_tipo(cliente):
+    """Un día admite dos Kikis: emparejar sólo por (fecha, tipo) perdía uno."""
+    libro = openpyxl.Workbook()
+    hoja = libro.active
+    hoja.title = "Kikis"
+    hoja.append(["Fecha", "Pretexto", "Motivación", "Calidad", "Tiempo", "Observaciones"])
+    hoja.append([date(2026, 5, 10), "Calentura", "Propia", 2, 1, "mañana"])
+    hoja.append([date(2026, 5, 10), "Necesidad", "Ambos", 4, 3, "noche"])
+    memoria = io.BytesIO()
+    libro.save(memoria)
+    contenido = memoria.getvalue()
+
+    def del_dia() -> int:
+        return cliente.get("/api/events?desde=2026-05-10&hasta=2026-05-10").json()["total"]
+
+    # Los dos entran aunque compartan fecha y tipo.
+    assert importer.importar(contenido, "dos.xlsx")["insertadas"] == 2
+    assert del_dia() == 2
+
+    # Y repetir la importación sigue sin duplicar.
+    assert importer.importar(contenido, "dos.xlsx")["insertadas"] == 0
+    assert del_dia() == 2
+
+
+def test_completa_lo_que_falta_del_mismo_dia(cliente):
+    """Si la BBDD tiene uno de los dos, entra el que falta, no ninguno."""
+    cliente.post("/api/events", json={
+        "fecha": "2026-05-10", "tipo": "Kiki", "pretexto": "Calentura",
+        "motivacion": "Propia", "calidad": 2, "tiempo": 1, "observaciones": "mañana",
+    })
+
+    libro = openpyxl.Workbook()
+    hoja = libro.active
+    hoja.title = "Kikis"
+    hoja.append(["Fecha", "Pretexto", "Motivación", "Calidad", "Tiempo", "Observaciones"])
+    hoja.append([date(2026, 5, 10), "Calentura", "Propia", 2, 1, "mañana"])
+    hoja.append([date(2026, 5, 10), "Necesidad", "Ambos", 4, 3, "noche"])
+    memoria = io.BytesIO()
+    libro.save(memoria)
+
+    informe = importer.importar(memoria.getvalue(), "dos.xlsx")
+    assert informe["insertadas"] == 1
+    assert informe["ya_existentes"] == 1
+    assert cliente.get("/api/events?desde=2026-05-10&hasta=2026-05-10").json()["total"] == 2
+
+
 def test_simular_no_escribe(cliente):
     informe = importer.importar(_libro_de_prueba(), "prueba.xlsx", simular=True)
     assert informe["simulado"] is True
