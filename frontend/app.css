@@ -37,7 +37,8 @@
   --color-nokiki: #d95926;
   --color-gayola: #256bb1;
   --color-marea: #c52233;
-  /* Segundo contexto secuencial del gráfico de valoraciones. */
+  /* Tono de la medida de 'tiempo': no es una categoría, pero necesita su
+     propio color en el medidor del KPI y en el gráfico de valoraciones. */
   --color-tiempo: #9085e9;
 
   --color-good: #0ca30c;
@@ -330,7 +331,19 @@
     border-radius: 3px;
     overflow: hidden;
     display: flex;
-    gap: 1px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* La cifra del mini-mes: misma lógica de fondo propio que en el mensual,
+     sólo que a escala. */
+  .cal-mini .cal-numero {
+    font-size: 0.625rem;
+    font-weight: 600;
+    padding: 0.0625rem 0.25rem;
+    border-radius: 0.25rem;
+    /* Deja libre la franja de Marea del pie. */
+    margin-bottom: 2px;
   }
 
   .cal-mini .cal-bandas {

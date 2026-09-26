@@ -104,7 +104,7 @@
   </section>
 
   <!-- ══ KPIs ══════════════════════════════════════════════════════════════ -->
-  <section class="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-6" aria-label="Métricas">
+  <section class="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-5" aria-label="Métricas">
 
     <!-- Cifra protagonista: una sola por vista -->
     <div class="card col-span-2 flex flex-col justify-between xl:col-span-2">
@@ -155,24 +155,10 @@
     <div class="card">
       <p class="card-title">Tiempo medio</p>
       <p class="mt-1 text-3xl font-semibold" x-text="Kiki.numero(resumen.promedios.tiempo)"></p>
-      <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-marea/20">
-        <div class="h-full rounded-full bg-marea"
+      <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-tiempo/20">
+        <div class="h-full rounded-full bg-tiempo"
              :style="`width: ${((resumen.promedios.tiempo || 0) / 4) * 100}%`"></div>
       </div>
-    </div>
-
-    <div class="card col-span-2 lg:col-span-2 xl:col-span-2">
-      <p class="card-title">Ciclo</p>
-      <div class="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <span class="text-3xl font-semibold text-marea"
-              x-text="Kiki.numero(resumen.ciclo.dia_del_ciclo)"></span>
-        <span class="card-hint">día del ciclo</span>
-      </div>
-      <p class="card-hint mt-1">
-        Ciclo medio <span class="text-ink-2" x-text="Kiki.numero(resumen.ciclo.ciclo_medio_dias, ' d')"></span> ·
-        duración <span class="text-ink-2" x-text="Kiki.numero(resumen.ciclo.duracion_media_dias, ' d')"></span> ·
-        próxima <span class="text-ink-2" x-text="Kiki.fechaCorta(resumen.ciclo.proxima_prevista)"></span>
-      </p>
     </div>
 
     <div class="card col-span-2">
@@ -300,6 +286,10 @@
                   </template>
                 </div>
                 <span class="cal-marea" x-show="celda.marea"></span>
+                <span class="cal-numero" x-show="!celda.fuera"
+                      :data-sobre-color="celda.bandas.length > 0"
+                      :class="celda.bandas.length ? '' : 'text-ink-3'"
+                      x-text="celda.dia"></span>
               </div>
             </template>
           </div>

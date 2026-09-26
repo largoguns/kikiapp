@@ -166,9 +166,10 @@ docker compose exec kiki-app python tools/import_file.py /app/data/Kiki.xlsx
     los que faltan en el mismo verde apagado, así que el nivel se cuenta en
     lugar de adivinarse. Las categorías sin valoración van en color plano.
   - La `Marea` no ocupa el cuadro: es una **franja roja al pie del día**.
-- **Panel de KPIs**: días desde el último Kiki, totales, medias de calidad y
-  tiempo, mayor sequía registrada y métricas de ciclo (día del ciclo, duración
-  media, próxima prevista).
+- **Panel de KPIs**: días desde el último Kiki, totales por categoría, medias
+  de calidad y tiempo, y mayor sequía registrada. Las métricas de ciclo
+  —día del ciclo, duración media, próxima prevista— se siguen calculando y
+  están en `GET /api/stats/summary`, pero no ocupan sitio en el panel.
 - **Filtros** —año, tipo, motivación, pretexto, calidad ≥, tiempo ≥ y búsqueda
   libre— en una sola fila que afecta a todo lo que hay debajo.
 - **Seis gráficos**, cada uno con su gemela en tabla a un clic. La `Marea`
