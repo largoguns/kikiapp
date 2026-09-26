@@ -507,7 +507,15 @@ function dashboard() {
           await this.recargar();
         }
       } catch (error) {
-        this.importacion.error = error.message;
+        // Un TypeError aquí es un corte de red: la petición no llegó o se
+        // perdió la respuesta, así que no se sabe si el servidor escribió.
+        // En modo combinar reintentar es seguro, porque es idempotente.
+        this.importacion.error = error instanceof TypeError
+          ? 'No se pudo contactar con el servidor, o se perdió la respuesta. '
+            + (this.importacion.modo === 'combinar'
+              ? 'Vuelve a pulsar Importar: en modo combinar repetirlo no duplica nada.'
+              : 'Comprueba el estado de los datos antes de reintentar en modo reemplazar.')
+          : error.message;
       } finally {
         this.importacion.enviando = false;
       }
