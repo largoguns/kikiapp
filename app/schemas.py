@@ -19,6 +19,11 @@ TIPOS_PUNTUADOS: tuple[str, ...] = (TIPO_KIKI,)
 # Categorías que cuentan para el porcentaje de acierto.
 TIPOS_INTENTO: tuple[str, ...] = (TIPO_KIKI, TIPO_NO_KIKI)
 
+# Categorías que registran con quién y por qué. La Gayola es un evento en
+# solitario y la Marea no es un encuentro: ninguna lleva pretexto ni
+# motivación.
+TIPOS_CON_CONTEXTO: tuple[str, ...] = (TIPO_KIKI, TIPO_NO_KIKI)
+
 MOTIVACIONES: tuple[str, ...] = ("Propia", "Ajena", "Ambos")
 
 # Sugerencias iniciales; la API devuelve además los pretextos ya usados en la BBDD.
@@ -67,11 +72,18 @@ class EventBase(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def _only_kiki_is_scored(self) -> "EventBase":
-        # Sólo el Kiki se valora; las demás categorías quedan a 0.
+    def _campos_propios_del_tipo(self) -> "EventBase":
+        """Vacía los campos que no tienen sentido para el tipo elegido.
+
+        Se hace aquí y no en el formulario para que valga igual viniendo de
+        la API, de la PWA o del importador.
+        """
         if self.tipo not in TIPOS_PUNTUADOS:
             object.__setattr__(self, "calidad", 0)
             object.__setattr__(self, "tiempo", 0)
+        if self.tipo not in TIPOS_CON_CONTEXTO:
+            object.__setattr__(self, "pretexto", None)
+            object.__setattr__(self, "motivacion", None)
         return self
 
 

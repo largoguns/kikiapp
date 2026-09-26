@@ -103,9 +103,19 @@ def test_resumen_y_series(cliente):
     assert calendario["dias"]["2026-03-01"]["calidad_max"] == 4
 
 
-def test_gayola_es_categoria_aparte_sin_puntuacion(cliente):
-    gayola = crear(cliente, tipo="Gayola", calidad=4, tiempo=4, motivacion="Ambos")
+def test_gayola_es_un_evento_en_solitario(cliente):
+    """Ni se valora ni lleva con quién ni por qué: es en solitario."""
+    gayola = crear(cliente, tipo="Gayola", calidad=4, tiempo=4,
+                   motivacion="Ambos", pretexto="Calentura",
+                   observaciones="esto sí se guarda")
     assert (gayola["calidad"], gayola["tiempo"]) == (0, 0)
+    assert gayola["pretexto"] is None
+    assert gayola["motivacion"] is None
+    assert gayola["observaciones"] == "esto sí se guarda"
+
+
+def test_gayola_es_categoria_aparte_en_las_metricas(cliente):
+    crear(cliente, tipo="Gayola")
 
     crear(cliente, fecha="2026-03-01", calidad=2, tiempo=2)      # Kiki
     crear(cliente, fecha="2026-03-02", tipo="No Kiki")
@@ -121,9 +131,11 @@ def test_gayola_es_categoria_aparte_sin_puntuacion(cliente):
     assert resumen["global"]["dias_sin_gayola"] is not None
     assert resumen["global"]["dias_sin_kiki"] != resumen["global"]["dias_sin_gayola"]
 
-    # Y aparece como serie propia en el reparto por motivación.
-    motivacion = cliente.get("/api/stats/breakdown").json()["motivacion"]
-    assert any(item["clave"] == "Ambos" and item["gayola"] == 1 for item in motivacion)
+    # Y no aparece en el reparto por motivación: no tiene ese campo.
+    reparto = cliente.get("/api/stats/breakdown").json()
+    for dimension in ("motivacion", "pretexto"):
+        assert all("gayola" not in item for item in reparto[dimension])
+    assert sum(item["total"] for item in reparto["motivacion"]) == 2  # Kiki + No Kiki
 
 
 def test_alta_por_rango_de_fechas(cliente):
@@ -153,6 +165,29 @@ def test_rango_invalido_se_rechaza(cliente):
     excesivo = cliente.post("/api/events/rango", json={
         "fecha": "2026-01-01", "hasta": "2026-12-31", "tipo": "Marea"})
     assert excesivo.status_code == 422
+
+
+def test_normalizacion_limpia_filas_antiguas(cliente):
+    """Las reglas por tipo han cambiado: al arrancar se ponen al día."""
+    from app import db
+
+    # Fila escrita a mano como la dejaría una versión anterior de la app.
+    with db.connect() as conexion:
+        conexion.execute(
+            "INSERT INTO events (fecha, tipo, pretexto, motivacion, calidad, tiempo,"
+            " created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            ("2026-02-02", "Gayola", "Calentura", "Propia", 4, 3, "x", "x"),
+        )
+
+    assert db.normalizar_por_tipo() == 1
+    with db.connect() as conexion:
+        fila = conexion.execute(
+            "SELECT * FROM events WHERE fecha = '2026-02-02'").fetchone()
+    assert fila["pretexto"] is None and fila["motivacion"] is None
+    assert (fila["calidad"], fila["tiempo"]) == (0, 0)
+
+    # Idempotente: una segunda pasada ya no toca nada.
+    assert db.normalizar_por_tipo() == 0
 
 
 def test_sin_importaciones_previas(cliente):

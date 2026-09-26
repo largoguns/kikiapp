@@ -27,7 +27,8 @@ from datetime import date, datetime, timedelta
 from typing import Any, Iterable, Optional
 
 from app import crud, db
-from app.schemas import MOTIVACIONES, TIPO_GAYOLA, TIPO_KIKI, TIPO_MAREA, TIPO_NO_KIKI
+from app.schemas import MOTIVACIONES, TIPOS_CON_CONTEXTO, TIPOS_PUNTUADOS
+from app.schemas import TIPO_GAYOLA, TIPO_KIKI, TIPO_MAREA, TIPO_NO_KIKI
 
 MAX_BYTES = 10 * 1024 * 1024
 META_ULTIMA_IMPORTACION = "import.ultima"
@@ -165,15 +166,18 @@ def fila_a_registro(valores: list[Any], mapa: dict[int, str]) -> Optional[dict[s
     calidad = _puntuacion(crudo.get("calidad"))
     tiempo = _puntuacion(crudo.get("tiempo"))
     tipo = inferir_tipo(calidad, tiempo, normalize_tipo(crudo.get("tipo")))
-    es_kiki = tipo == TIPO_KIKI
+    # Las mismas reglas que aplica el modelo: sólo el Kiki se valora, y sólo
+    # Kiki y No Kiki llevan pretexto y motivación.
+    puntuado = tipo in TIPOS_PUNTUADOS
+    con_contexto = tipo in TIPOS_CON_CONTEXTO
 
     return {
         "fecha": fecha,
         "tipo": tipo,
-        "pretexto": _texto(crudo.get("pretexto")),
-        "motivacion": normalize_motivacion(crudo.get("motivacion")),
-        "calidad": calidad if es_kiki else 0,
-        "tiempo": tiempo if es_kiki else 0,
+        "pretexto": _texto(crudo.get("pretexto")) if con_contexto else None,
+        "motivacion": normalize_motivacion(crudo.get("motivacion")) if con_contexto else None,
+        "calidad": calidad if puntuado else 0,
+        "tiempo": tiempo if puntuado else 0,
         "observaciones": _texto(crudo.get("observaciones")),
     }
 

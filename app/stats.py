@@ -15,7 +15,7 @@ from typing import Any, Optional
 from app import config, crud
 from app.crud import EventFilters
 from app.schemas import TIPO_GAYOLA, TIPO_KIKI, TIPO_MAREA, TIPO_NO_KIKI
-from app.schemas import TIPOS, TIPOS_INTENTO
+from app.schemas import TIPOS, TIPOS_CON_CONTEXTO, TIPOS_INTENTO
 
 MESES = (
     "Ene", "Feb", "Mar", "Abr", "May", "Jun",
@@ -273,10 +273,11 @@ def yearly(filters: Optional[EventFilters] = None) -> list[dict[str, Any]]:
 def breakdown(filters: Optional[EventFilters] = None) -> dict[str, Any]:
     """Reparto por motivación y por pretexto.
 
-    La Marea queda fuera: no tiene ni motivación ni pretexto.
+    Sólo entran las categorías que llevan esos campos: la Gayola es en
+    solitario y la Marea no es un encuentro, así que ninguna aparece aquí.
     """
-    rows = [row for row in _fetch(filters) if row["tipo"] != TIPO_MAREA]
-    claves = [CLAVE_TIPO[tipo] for tipo in TIPOS if tipo != TIPO_MAREA]
+    rows = [row for row in _fetch(filters) if row["tipo"] in TIPOS_CON_CONTEXTO]
+    claves = [CLAVE_TIPO[tipo] for tipo in TIPOS_CON_CONTEXTO]
 
     def agrupar(campo: str) -> list[dict[str, Any]]:
         acumulado: dict[str, dict[str, Any]] = {}

@@ -2,7 +2,11 @@
 
    Cada constructor devuelve { config, tabla }: la configuración de Chart.js y
    su gemela en tabla, para que ningún valor quede accesible sólo por color o
-   sólo por tooltip. */
+   sólo por tooltip.
+
+   La Marea no se pinta en ninguna serie: es un bloque de siete días o más al
+   mes, así que aplastaría la escala de los encuentros sin aportar nada que no
+   cuente ya el calendario y la tarjeta de ciclo. */
 (function (global) {
   'use strict';
 
@@ -134,7 +138,6 @@
             serie('Kiki', C.kiki, meses.map((mes) => mes.kiki)),
             serie('No Kiki', C.nokiki, meses.map((mes) => mes.no_kiki)),
             serie('Gayola', C.gayola, meses.map((mes) => mes.gayola)),
-            serie('Marea', C.marea, meses.map((mes) => mes.marea)),
           ],
         },
         options: opcionesBase({
@@ -142,13 +145,12 @@
         }),
       },
       tabla: tabla(
-        ['Mes', 'Kiki', 'No Kiki', 'Gayola', 'Marea', 'Calidad media', 'Tiempo medio'],
+        ['Mes', 'Kiki', 'No Kiki', 'Gayola', 'Calidad media', 'Tiempo medio'],
         meses.map((mes) => [
           mes.etiqueta,
           mes.kiki,
           mes.no_kiki,
           mes.gayola,
-          mes.marea,
           mes.calidad_media ?? '—',
           mes.tiempo_medio ?? '—',
         ])
@@ -167,7 +169,6 @@
             serie('Kiki', C.kiki, anios.map((a) => a.kiki)),
             serie('No Kiki', C.nokiki, anios.map((a) => a.no_kiki)),
             serie('Gayola', C.gayola, anios.map((a) => a.gayola)),
-            serie('Marea', C.marea, anios.map((a) => a.marea)),
           ],
         },
         options: opcionesBase({
@@ -175,9 +176,9 @@
         }),
       },
       tabla: tabla(
-        ['Año', 'Kiki', 'No Kiki', 'Gayola', 'Marea', 'Calidad media', 'Tiempo medio'],
+        ['Año', 'Kiki', 'No Kiki', 'Gayola', 'Calidad media', 'Tiempo medio'],
         anios.map((a) => [
-          a.anio, a.kiki, a.no_kiki, a.gayola, a.marea,
+          a.anio, a.kiki, a.no_kiki, a.gayola,
           a.calidad_media ?? '—', a.tiempo_medio ?? '—',
         ])
       ),
@@ -226,7 +227,6 @@
         clave: 'Otros',
         kiki: resto.reduce((suma, item) => suma + item.kiki, 0),
         no_kiki: resto.reduce((suma, item) => suma + item.no_kiki, 0),
-        gayola: resto.reduce((suma, item) => suma + (item.gayola || 0), 0),
         total: resto.reduce((suma, item) => suma + item.total, 0),
         calidad_media: null,
       });
@@ -248,11 +248,6 @@
                 backgroundColor: C.nokiki },
               BARRA_HORIZONTAL
             ),
-            Object.assign(
-              { label: 'Gayola', data: ordenados.map((i) => i.gayola || 0),
-                backgroundColor: C.gayola },
-              BARRA_HORIZONTAL
-            ),
           ],
         },
         options: opcionesBase({
@@ -264,9 +259,9 @@
         }),
       },
       tabla: tabla(
-        ['Categoría', 'Kiki', 'No Kiki', 'Gayola', 'Total', 'Calidad media'],
+        ['Categoría', 'Kiki', 'No Kiki', 'Total', 'Calidad media'],
         ordenados.map((item) => [
-          item.clave, item.kiki, item.no_kiki, item.gayola || 0, item.total,
+          item.clave, item.kiki, item.no_kiki, item.total,
           item.calidad_media ?? '—',
         ])
       ),
@@ -284,7 +279,6 @@
             serie('Kiki', C.kiki, dias.map((d) => d.kiki)),
             serie('No Kiki', C.nokiki, dias.map((d) => d.no_kiki)),
             serie('Gayola', C.gayola, dias.map((d) => d.gayola)),
-            serie('Marea', C.marea, dias.map((d) => d.marea)),
           ],
         },
         options: opcionesBase({
@@ -292,8 +286,8 @@
         }),
       },
       tabla: tabla(
-        ['Día', 'Kiki', 'No Kiki', 'Gayola', 'Marea'],
-        dias.map((d) => [d.dia, d.kiki, d.no_kiki, d.gayola, d.marea])
+        ['Día', 'Kiki', 'No Kiki', 'Gayola'],
+        dias.map((d) => [d.dia, d.kiki, d.no_kiki, d.gayola])
       ),
     };
   }

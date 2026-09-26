@@ -208,17 +208,17 @@ function dashboard() {
       const ambito = this.etiquetaAmbito;
       return [
         { id: 'mensual', titulo: `Evolución mensual · ${this.anioCalendario}`,
-          subtitulo: 'Registros por mes y tipo' },
+          subtitulo: 'Encuentros por mes · la Marea se ve en el calendario' },
         { id: 'anual', titulo: 'Histórico por año',
-          subtitulo: 'Todos los años (el filtro de año no aplica aquí)' },
+          subtitulo: 'Encuentros por año (el filtro de año no aplica aquí)' },
         { id: 'distribucion', titulo: 'Distribución de valoraciones',
           subtitulo: `Cuántos Kikis en cada nivel 0–4 · ${ambito}` },
         { id: 'motivacion', titulo: 'Por motivación',
-          subtitulo: `De quién surgió la iniciativa · ${ambito}` },
+          subtitulo: `De quién surgió la iniciativa · sólo Kiki y No Kiki · ${ambito}` },
         { id: 'pretexto', titulo: 'Por pretexto',
-          subtitulo: `Seis principales, el resto agrupado · ${ambito}` },
+          subtitulo: `Seis principales · sólo Kiki y No Kiki · ${ambito}` },
         { id: 'semana', titulo: 'Por día de la semana',
-          subtitulo: `Reparto semanal · ${ambito}` },
+          subtitulo: `Encuentros por día de la semana · ${ambito}` },
       ];
     },
 

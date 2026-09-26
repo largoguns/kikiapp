@@ -467,7 +467,10 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-4" x-show="modal.form.tipo !== 'Marea'">
+        <!-- La Gayola es en solitario y la Marea no es un encuentro:
+             ninguna lleva motivación ni pretexto. -->
+        <div class="grid grid-cols-2 gap-4"
+             x-show="['Kiki', 'No Kiki'].includes(modal.form.tipo)">
           <div>
             <label class="label" for="m-motivacion">Motivación</label>
             <select id="m-motivacion" class="field" x-model="modal.form.motivacion">

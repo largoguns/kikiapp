@@ -144,8 +144,8 @@
       </div>
     </template>
 
-    <!-- Motivación y pretexto -->
-    <template x-if="form.tipo !== 'Marea'">
+    <!-- Motivación y pretexto: sólo los encuentros con otra persona -->
+    <template x-if="['Kiki', 'No Kiki'].includes(form.tipo)">
       <div class="space-y-5">
         <section>
           <span class="label">Motivación</span>

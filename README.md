@@ -164,7 +164,10 @@ docker compose exec kiki-app python tools/import_file.py /app/data/Kiki.xlsx
   media, próxima prevista).
 - **Filtros** —año, tipo, motivación, pretexto, calidad ≥, tiempo ≥ y búsqueda
   libre— en una sola fila que afecta a todo lo que hay debajo.
-- **Seis gráficos**, cada uno con su gemela en tabla a un clic.
+- **Seis gráficos**, cada uno con su gemela en tabla a un clic. La `Marea`
+  no se pinta en ninguno: es un bloque de siete días o más al mes, así que
+  aplastaría la escala de los encuentros sin aportar nada que no cuenten ya
+  el calendario y la tarjeta de ciclo.
 - **Tabla de registros** con ordenación por columna, paginación y edición o
   borrado en línea.
 
@@ -268,16 +271,23 @@ cada tipo adicional presente.
 
 ### Qué cuenta en cada métrica
 
-| Categoría | Se valora | Días sin… | % de acierto |
-| :--- | :---: | :--- | :---: |
-| `Kiki` | sí, calidad y tiempo 0–4 | resetea «días sin Kiki» | suma |
-| `No Kiki` | no | — | resta |
-| `Gayola` | no | tiene su propio «días sin Gayola» | no entra |
-| `Marea` | no | — | no entra |
+| Categoría | Calidad y tiempo | Pretexto y motivación | Días sin… | % de acierto |
+| :--- | :---: | :---: | :--- | :---: |
+| `Kiki` | sí, 0–4 | sí | resetea «días sin Kiki» | suma |
+| `No Kiki` | no | sí | — | resta |
+| `Gayola` | no | **no** | tiene su propio «días sin Gayola» | no entra |
+| `Marea` | no | no | — | no entra |
 
 `Gayola` es una **categoría aparte**: tiene sus propios totales y su propio
 contador de días, y no toca ni el contador de días sin Kiki ni el porcentaje
-de acierto, que siguen comparando sólo `Kiki` contra `No Kiki`.
+de acierto, que siguen comparando sólo `Kiki` contra `No Kiki`. Al ser un
+evento **en solitario** no lleva pretexto ni motivación —no hay iniciativa de
+nadie que registrar—, así que tampoco aparece en los repartos por esas dos
+dimensiones. Sí admite observaciones.
+
+El servidor vacía por su cuenta los campos que no corresponden al tipo, así
+que la regla vale igual llegando desde la API, desde la PWA o desde el
+importador.
 
 ### Alta por rango
 
